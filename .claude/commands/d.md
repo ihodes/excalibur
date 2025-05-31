@@ -1,0 +1,1 @@
+Read diff.diff in 1000 line chunks, to refresh your memory. This is the core skeleton of how we should implement what we're trying to do, as we know this worked in the past to add boolean shape manipulation into excalidraw.

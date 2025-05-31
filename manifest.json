@@ -1,0 +1,33 @@
+{
+  "manifest_version": 3,
+  "name": "Excalidraw Boolean Operations",
+  "version": "1.0.0",
+  "description": "Adds boolean shape operations (Union, Intersection, Difference, Exclusion) to Excalidraw",
+  "permissions": [
+    "activeTab"
+  ],
+  "host_permissions": [
+    "https://excalidraw.com/*",
+    "https://app.excalidraw.com/*",
+    "http://localhost/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://excalidraw.com/*", "https://app.excalidraw.com/*", "http://localhost/*"],
+      "js": ["scripts/content-production.js"],
+      "css": ["styles/content.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["scripts/state-monitor.js", "scripts/debug-state.js"],
+      "matches": ["https://excalidraw.com/*", "https://app.excalidraw.com/*", "http://localhost/*"]
+    }
+  ]
+}

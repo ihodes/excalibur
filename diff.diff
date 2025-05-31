@@ -1,0 +1,3274 @@
+diff --git a/src/actions/actionMenu.tsx b/src/actions/actionMenu.tsx
+index a87b62fc5188..2ccf0d08cde6 100644
+--- a/src/actions/actionMenu.tsx
++++ b/src/actions/actionMenu.tsx
+@@ -1,5 +1,5 @@
+ import React from "react";
+-import { menu, palette } from "../components/icons";
++import { menu, palette, path } from "../components/icons";
+ import { ToolButton } from "../components/ToolButton";
+ import { t } from "../i18n";
+ import { showSelectedShapeActions, getNonDeletedElements } from "../element";
+@@ -7,6 +7,7 @@ import { register } from "./register";
+ import { allowFullScreen, exitFullScreen, isFullScreen } from "../utils";
+ import { KEYS } from "../keys";
+ import { HelpIcon } from "../components/HelpIcon";
++import { isBoolable } from "../actions/bool/commonBoolHelpers";
+ 
+ export const actionToggleCanvasMenu = register({
+   name: "toggleCanvasMenu",
+@@ -52,6 +53,27 @@ export const actionToggleEditMenu = register({
+   ),
+ });
+ 
++export const actionTogglePathMenu = register({
++  name: "togglePathMenu",
++  perform: (_elements, appState) => ({
++    appState: {
++      ...appState,
++      openMenu: appState.openMenu === "path" ? null : "path",
++    },
++    commitToHistory: false,
++  }),
++  PanelComponent: ({ elements, appState, updateData }) =>
++    isBoolable(elements, appState) ? (
++      <ToolButton
++        type="button"
++        icon={path}
++        aria-label={t("buttons.edit")}
++        onClick={updateData}
++        selected={appState.openMenu === "path"}
++      />
++    ) : null,
++});
++
+ export const actionFullScreen = register({
+   name: "toggleFullScreen",
+   perform: () => {
+diff --git a/src/actions/bool/actionShapeDifference.tsx b/src/actions/bool/actionShapeDifference.tsx
+new file mode 100644
+index 000000000000..65e4b871b523
+--- /dev/null
++++ b/src/actions/bool/actionShapeDifference.tsx
+@@ -0,0 +1,36 @@
++import React from "react";
++import { register } from "../register";
++import { ToolButton } from "../../components/ToolButton";
++import { difference } from "../../components/icons";
++import { t } from "../../i18n";
++import { getShortcutKey } from "../../utils";
++import { isBoolable, performShapeBool } from "./commonBoolHelpers";
++
++export const actionShapeDifference = register({
++  name: "shapeDifference",
++  perform: (elements, appState) => {
++    const { nextElements, nextAppState } = performShapeBool(
++      elements,
++      appState,
++      "difference",
++    );
++
++    return {
++      elements: nextElements,
++      appState: nextAppState,
++      commitToHistory: true,
++    };
++  },
++  contextItemLabel: "labels.shapeDifference",
++  keyTest: (event) => event.altKey && event.key === "–",
++  PanelComponent: ({ elements, appState, updateData }) =>
++    isBoolable(elements, appState) ? (
++      <ToolButton
++        type="button"
++        icon={difference}
++        title={`${t("labels.shapeDifference")} — ${getShortcutKey("Alt+-")}`}
++        aria-label={t("labels.shapeDifference")}
++        onClick={() => updateData(null)}
++      />
++    ) : null,
++});
+diff --git a/src/actions/bool/actionShapeExclusion.tsx b/src/actions/bool/actionShapeExclusion.tsx
+new file mode 100644
+index 000000000000..341912665973
+--- /dev/null
++++ b/src/actions/bool/actionShapeExclusion.tsx
+@@ -0,0 +1,36 @@
++import React from "react";
++import { register } from "../register";
++import { ToolButton } from "../../components/ToolButton";
++import { exclusion } from "../../components/icons";
++import { t } from "../../i18n";
++import { getShortcutKey } from "../../utils";
++import { isBoolable, performShapeBool } from "./commonBoolHelpers";
++
++export const actionShapeExclusion = register({
++  name: "shapeExclusion",
++  perform: (elements, appState) => {
++    const { nextElements, nextAppState } = performShapeBool(
++      elements,
++      appState,
++      "exclusion",
++    );
++
++    return {
++      elements: nextElements,
++      appState: nextAppState,
++      commitToHistory: true,
++    };
++  },
++  contextItemLabel: "labels.shapeExclusion",
++  keyTest: (event) => event.altKey && event.key === "§",
++  PanelComponent: ({ elements, appState, updateData }) =>
++    isBoolable(elements, appState) ? (
++      <ToolButton
++        type="button"
++        icon={exclusion}
++        title={`${t("labels.shapeExclusion")} — ${getShortcutKey("Alt+^")}`}
++        aria-label={t("labels.shapeExclusion")}
++        onClick={() => updateData(null)}
++      />
++    ) : null,
++});
+diff --git a/src/actions/bool/actionShapeIntersection.tsx b/src/actions/bool/actionShapeIntersection.tsx
+new file mode 100644
+index 000000000000..52ced96c9a78
+--- /dev/null
++++ b/src/actions/bool/actionShapeIntersection.tsx
+@@ -0,0 +1,36 @@
++import React from "react";
++import { register } from "../register";
++import { ToolButton } from "../../components/ToolButton";
++import { intersection } from "../../components/icons";
++import { t } from "../../i18n";
++import { getShortcutKey } from "../../utils";
++import { isBoolable, performShapeBool } from "./commonBoolHelpers";
++
++export const actionShapeIntersection = register({
++  name: "shapeIntersection",
++  perform: (elements, appState) => {
++    const { nextElements, nextAppState } = performShapeBool(
++      elements,
++      appState,
++      "intersection",
++    );
++
++    return {
++      elements: nextElements,
++      appState: nextAppState,
++      commitToHistory: true,
++    };
++  },
++  contextItemLabel: "labels.shapeIntersection",
++  keyTest: (event) => event.altKey && event.key === "•",
++  PanelComponent: ({ elements, appState, updateData }) =>
++    isBoolable(elements, appState) ? (
++      <ToolButton
++        type="button"
++        icon={intersection}
++        title={`${t("labels.shapeIntersection")} — ${getShortcutKey("Alt+*")}`}
++        aria-label={t("labels.shapeIntersection")}
++        onClick={() => updateData(null)}
++      />
++    ) : null,
++});
+diff --git a/src/actions/bool/actionShapeUnion.tsx b/src/actions/bool/actionShapeUnion.tsx
+new file mode 100644
+index 000000000000..9cd4a1935aac
+--- /dev/null
++++ b/src/actions/bool/actionShapeUnion.tsx
+@@ -0,0 +1,36 @@
++import React from "react";
++import { register } from "../register";
++import { ToolButton } from "../../components/ToolButton";
++import { union } from "../../components/icons";
++import { t } from "../../i18n";
++import { getShortcutKey } from "../../utils";
++import { isBoolable, performShapeBool } from "./commonBoolHelpers";
++
++export const actionShapeUnion = register({
++  name: "shapeUnion",
++  perform: (elements, appState) => {
++    const { nextElements, nextAppState } = performShapeBool(
++      elements,
++      appState,
++      "union",
++    );
++
++    return {
++      elements: nextElements,
++      appState: nextAppState,
++      commitToHistory: true,
++    };
++  },
++  contextItemLabel: "labels.shapeUnion",
++  keyTest: (event) => event.altKey && event.key === "≠",
++  PanelComponent: ({ elements, appState, updateData }) =>
++    isBoolable(elements, appState) ? (
++      <ToolButton
++        type="button"
++        icon={union}
++        title={`${t("labels.shapeUnion")} — ${getShortcutKey("Alt++")}`}
++        aria-label={t("labels.shapeUnion")}
++        onClick={() => updateData(null)}
++      />
++    ) : null,
++});
+diff --git a/src/actions/bool/commonBoolHelpers.ts b/src/actions/bool/commonBoolHelpers.ts
+new file mode 100644
+index 000000000000..7fded89df65c
+--- /dev/null
++++ b/src/actions/bool/commonBoolHelpers.ts
+@@ -0,0 +1,99 @@
++import rough from "roughjs/bin/rough";
++import {
++  ExcalidrawElement,
++  NonDeletedExcalidrawElement,
++} from "../../element/types";
++import { getNonDeletedElements } from "../../element";
++import { deleteSelectedElements } from "../actionDeleteSelected";
++import { AppState } from "../../types";
++import { operateBool } from "../../element";
++
++interface SelectedElements {
++  elements: readonly NonDeletedExcalidrawElement[];
++  firstSelectedIndex: number;
++}
++
++export function getSelectedElements(
++  elements: readonly ExcalidrawElement[],
++  appState: AppState,
++) {
++  const nonDeletedElements = getNonDeletedElements(elements);
++  const selectedElements = {} as SelectedElements;
++  selectedElements.firstSelectedIndex = -1;
++
++  selectedElements.elements = nonDeletedElements.filter(({ id }, i) => {
++    if (appState.selectedElementIds[id]) {
++      if (selectedElements.firstSelectedIndex === -1) {
++        selectedElements.firstSelectedIndex = i;
++      }
++
++      return true;
++    }
++
++    return false;
++  });
++
++  return selectedElements;
++}
++
++export function isBoolable(
++  elements: readonly ExcalidrawElement[],
++  appState: AppState,
++): boolean {
++  const selectedElements = getSelectedElements(elements, appState);
++
++  return (
++    selectedElements.elements.length > 1 &&
++    selectedElements.elements.every((element: ExcalidrawElement) => {
++      if (["arrow", "text"].includes(element.type)) {
++        return false;
++      }
++
++      if (element.type === "line") {
++        const first = element.points[0];
++        const last = element.points[element.points.length - 1];
++
++        return first[0] === last[0] && first[1] === last[1];
++      }
++
++      return true;
++    })
++  );
++}
++
++export function performShapeBool(
++  elements: readonly ExcalidrawElement[],
++  appState: AppState,
++  action: "difference" | "union" | "intersection" | "exclusion",
++) {
++  const canvas = document.createElement("canvas");
++  const rc = rough.canvas(canvas);
++  const selectedElements = getSelectedElements(elements, appState);
++
++  const newElement = selectedElements.elements.reduce(
++    (
++      acc: NonDeletedExcalidrawElement,
++      element: NonDeletedExcalidrawElement,
++    ) => {
++      if (!acc) {
++        return element;
++      }
++
++      return operateBool(acc, element, rc, action);
++    },
++  );
++
++  const {
++    elements: nextElements,
++    appState: nextAppState,
++  } = deleteSelectedElements(elements, appState);
++
++  if (newElement) {
++    nextElements.splice(selectedElements.firstSelectedIndex, 0, newElement);
++  }
++
++  return {
++    nextElements,
++    nextAppState,
++  };
++}
+diff --git a/src/actions/index.ts b/src/actions/index.ts
+index 162c49057902..aa8a0f3827a3 100644
+--- a/src/actions/index.ts
++++ b/src/actions/index.ts
+@@ -7,6 +7,10 @@ export {
+ } from "./actionZindex";
+ export { actionSelectAll } from "./actionSelectAll";
+ export { actionDuplicateSelection } from "./actionDuplicateSelection";
++export { actionShapeDifference } from "./bool/actionShapeDifference";
++export { actionShapeUnion } from "./bool/actionShapeUnion";
++export { actionShapeIntersection } from "./bool/actionShapeIntersection";
++export { actionShapeExclusion } from "./bool/actionShapeExclusion";
+ export {
+   actionChangeStrokeColor,
+   actionChangeBackgroundColor,
+@@ -44,6 +48,7 @@ export {
+   actionToggleEditMenu,
+   actionFullScreen,
+   actionShortcuts,
++  actionTogglePathMenu,
+ } from "./actionMenu";
+ 
+ export { actionGroup, actionUngroup } from "./actionGroup";
+diff --git a/src/actions/types.ts b/src/actions/types.ts
+index f2642192501d..3de8292c5614 100644
+--- a/src/actions/types.ts
++++ b/src/actions/types.ts
+@@ -38,6 +38,7 @@ export type ActionName =
+   | "changeOpacity"
+   | "changeFontSize"
+   | "toggleCanvasMenu"
++  | "togglePathMenu"
+   | "toggleEditMenu"
+   | "undo"
+   | "redo"
+@@ -49,6 +50,10 @@ export type ActionName =
+   | "saveAsScene"
+   | "loadScene"
+   | "duplicateSelection"
++  | "shapeDifference"
++  | "shapeUnion"
++  | "shapeIntersection"
++  | "shapeExclusion"
+   | "deleteSelectedElements"
+   | "changeViewBackgroundColor"
+   | "clearCanvas"
+diff --git a/src/appState.ts b/src/appState.ts
+index 04c1eaf9c5d5..e10d8813d29c 100644
+--- a/src/appState.ts
++++ b/src/appState.ts
+
++/**
++ * Config containing all AppState keys. Used to determine whether given state
++ *  prop should be stripped when exporting to given storage type.
++ */
++const APP_STATE_STORAGE_CONF = (<
++  Values extends {
++    /** whether to keep when storing to browser storage (localStorage/IDB) */
++    browser: boolean;
++    /** whether to keep when exporting to file/database */
++    export: boolean;
++  },
++  T extends Record<keyof AppState, Values>
++>(
++  config: { [K in keyof T]: K extends keyof AppState ? T[K] : never },
++) => config)({
++  collaborators: { browser: false, export: false },
++  currentItemBackgroundColor: { browser: true, export: false },
++  currentItemFillStyle: { browser: true, export: false },
++  currentItemFontFamily: { browser: true, export: false },
++  currentItemFontSize: { browser: true, export: false },
++  currentItemOpacity: { browser: true, export: false },
++  currentItemRoughness: { browser: true, export: false },
++  currentItemStrokeColor: { browser: true, export: false },
++  currentItemStrokeStyle: { browser: true, export: false },
++  currentItemStrokeWidth: { browser: true, export: false },
++  currentItemTextAlign: { browser: true, export: false },
++  cursorButton: { browser: true, export: false },
++  cursorX: { browser: true, export: false },
++  cursorY: { browser: true, export: false },
++  draggingElement: { browser: false, export: false },
++  editingElement: { browser: false, export: false },
++  editingGroupId: { browser: true, export: false },
++  editingLinearElement: { browser: false, export: false },
++  elementLocked: { browser: true, export: false },
++  elementType: { browser: true, export: false },
++  errorMessage: { browser: false, export: false },
++  exportBackground: { browser: true, export: false },
++  gridSize: { browser: true, export: true },
++  height: { browser: false, export: false },
++  isCollaborating: { browser: false, export: false },
++  isLibraryOpen: { browser: false, export: false },
++  isLoading: { browser: false, export: false },
++  isResizing: { browser: false, export: false },
++  isRotating: { browser: false, export: false },
++  lastPointerDownWith: { browser: true, export: false },
++  multiElement: { browser: false, export: false },
++  name: { browser: true, export: false },
++  openMenu: { browser: true, export: false },
++  previousSelectedElementIds: { browser: true, export: false },
++  resizingElement: { browser: false, export: false },
++  scrolledOutside: { browser: true, export: false },
++  scrollX: { browser: true, export: false },
++  scrollY: { browser: true, export: false },
++  selectedElementIds: { browser: true, export: false },
++  selectedGroupIds: { browser: true, export: false },
++  selectionElement: { browser: false, export: false },
++  shouldAddWatermark: { browser: true, export: false },
++  shouldCacheIgnoreZoom: { browser: true, export: false },
++  showShortcutsDialog: { browser: false, export: false },
++  username: { browser: true, export: false },
++  viewBackgroundColor: { browser: true, export: true },
++  width: { browser: false, export: false },
++  zenModeEnabled: { browser: true, export: false },
++  zoom: { browser: true, export: false },
++});
++
++const _clearAppStateForStorage = <ExportType extends "export" | "browser">(
++  appState: Partial<AppState>,
++  exportType: ExportType,
++) => {
++  type ExportableKeys = {
++    [K in keyof typeof APP_STATE_STORAGE_CONF]: typeof APP_STATE_STORAGE_CONF[K][ExportType] extends true
++      ? K
++      : never;
++  }[keyof typeof APP_STATE_STORAGE_CONF];
++  const stateForExport = {} as { [K in ExportableKeys]?: typeof appState[K] };
++  for (const key of Object.keys(appState) as (keyof typeof appState)[]) {
++    if (APP_STATE_STORAGE_CONF[key][exportType]) {
++      // @ts-ignore see https://github.com/microsoft/TypeScript/issues/31445
++      stateForExport[key] = appState[key];
++    }
++  }
++  return stateForExport;
+ };
+
++export const clearAppStateForLocalStorage = (appState: Partial<AppState>) => {
++  return _clearAppStateForStorage(appState, "browser");
++};
++
++export const cleanAppStateForExport = (appState: Partial<AppState>) => {
++  return _clearAppStateForStorage(appState, "export");
+ };
+diff --git a/src/components/Actions.tsx b/src/components/Actions.tsx
+index 15e1c7406894..147d65695bc5 100644
+--- a/src/components/Actions.tsx
++++ b/src/components/Actions.tsx
+@@ -76,6 +76,10 @@ export const SelectedShapeActions = ({
+         <fieldset>
+           <legend>{t("labels.actions")}</legend>
+           <div className="buttonList">
++            {renderAction("shapeUnion")}
++            {renderAction("shapeDifference")}
++            {renderAction("shapeIntersection")}
++            {renderAction("shapeExclusion")}
+             {renderAction("duplicateSelection")}
+             {renderAction("deleteSelectedElements")}
+           </div>
+diff --git a/src/components/App.tsx b/src/components/App.tsx
+index cce721cb1903..7f127c373797 100644
+--- a/src/components/App.tsx
++++ b/src/components/App.tsx
+@@ -55,8 +55,9 @@ import {
+ import Portal from "./Portal";
+ 
+ import { renderScene } from "../renderer";
++import { AppState, GestureEvent, Gesture, ExcalidrawProps } from "../types";
+ import {
+   ExcalidrawElement,
+   ExcalidrawTextElement,
+   NonDeleted,
+   ExcalidrawGenericElement,
+@@ -126,6 +125,7 @@ import {
+   LOCAL_STORAGE_KEY_COLLAB_FORCE_FLAG,
+ } from "../constants";
+ import {
++  INITIAL_SCENE_UPDATE_TIMEOUT,
+   TAP_TWICE_TIMEOUT,
+   SYNC_FULL_SCENE_INTERVAL_MS,
+   TOUCH_CTX_MENU_TIMEOUT,
+@@ -247,7 +246,7 @@ class App extends React.Component<ExcalidrawProps, AppState> {
+     height: window.innerHeight,
+   };
+ 
+-  constructor(props: any) {
++  constructor(props: ExcalidrawProps) {
+     super(props);
+     const defaultAppState = getDefaultAppState();
+ 
+@@ -1035,7 +1034,7 @@ class App extends React.Component<ExcalidrawProps, AppState> {
+       //  initial SCENE_UPDATE message
+       const initializationTimer = setTimeout(
+         initialize,
+-        INITAL_SCENE_UPDATE_TIMEOUT,
++        INITIAL_SCENE_UPDATE_TIMEOUT,
+       );
+ 
+       const updateScene = (
+diff --git a/src/components/MobileMenu.tsx b/src/components/MobileMenu.tsx
+index 44366fce4595..21454b6b15f4 100644
+--- a/src/components/MobileMenu.tsx
++++ b/src/components/MobileMenu.tsx
+@@ -16,6 +16,7 @@ import { RoomDialog } from "./RoomDialog";
+ import { SCROLLBAR_WIDTH, SCROLLBAR_MARGIN } from "../scene/scrollbars";
+ import { LockIcon } from "./LockIcon";
+ import { LoadingMessage } from "./LoadingMessage";
++import { isBoolable } from "../actions/bool/commonBoolHelpers";
+ import { UserList } from "./UserList";
+ 
+ type MobileMenuProps = {
+@@ -136,6 +137,17 @@ export const MobileMenu = ({
+               elementType={appState.elementType}
+             />
+           </Section>
++        ) : appState.openMenu === "path" && isBoolable(elements, appState) ? (
++          <Section className="App-mobile-menu" heading="selectedShapeActions">
++            <div className="panelColumn">
++              <div className="buttonList">
++                {actionManager.renderAction("shapeUnion")}
++                {actionManager.renderAction("shapeDifference")}
++                {actionManager.renderAction("shapeIntersection")}
++                {actionManager.renderAction("shapeExclusion")}
++              </div>
++            </div>
++          </Section>
+         ) : null}
+         <footer className="App-toolbar">
+           <div className="App-toolbar-content">
+@@ -143,6 +155,7 @@ export const MobileMenu = ({
+             {actionManager.renderAction("toggleEditMenu")}
+             {actionManager.renderAction("undo")}
+             {actionManager.renderAction("redo")}
++            {actionManager.renderAction("togglePathMenu")}
+             {actionManager.renderAction(
+               appState.multiElement ? "finalize" : "duplicateSelection",
+             )}
+diff --git a/src/components/icons.tsx b/src/components/icons.tsx
+index 901cdb9145aa..285bb0b4d683 100644
+--- a/src/components/icons.tsx
++++ b/src/components/icons.tsx
+@@ -179,6 +179,60 @@ export const sendToBack = createIcon(
+   { width: 24 },
+ );
+ 
++export const difference = createIcon(
++  <>
++    <path d="M48 128c-26.51 0-48 21.49-48 48v288c0 26.51 21.49 48 48 48h288c26.51 0 48-21.49 48-48v-90.98A192 192 0 01320 384a192 192 0 01-192-192 192 192 0 0110.98-64z" />
++    <path
++      d="M290.233 0a194.725 194.725 0 00-80.364 33.286l27.005 27.005a157.2 157.2 0 0153.36-22.102zm64.909 0v38.189A157.2 157.2 0 01408.5 60.29l27.004-27.005A194.725 194.725 0 00355.142 0zM481.4 79.182l-27.002 27.003a157.2 157.2 0 0122.102 53.362h38.187A194.725 194.725 0 00481.4 79.182zm-317.425.002a194.725 194.725 0 00-33.288 80.363h38.188a157.2 157.2 0 0122.102-53.36zm-33.288 145.271a194.725 194.725 0 0033.286 80.363l27.004-27.005a157.2 157.2 0 01-22.102-53.358zm345.813 0a157.2 157.2 0 01-22.104 53.358l27.004 27.005a194.725 194.725 0 0033.287-80.363zm-239.626 99.256l-27.003 27.003A194.725 194.725 0 00290.233 384v-38.189a157.2 157.2 0 01-53.36-22.1zm171.626 0a157.2 157.2 0 01-53.358 22.102V384a194.725 194.725 0 0080.36-33.286z"
++      fill="#fba94d"
++    />
++  </>,
++  { mirror: true },
++);
++
++export const union = createIcon(
++  <>
++    <path d="M320 0a192 192 0 00-181.02 128H48c-26.51 0-48 21.49-48 48v288c0 26.51 21.49 48 48 48h288c26.51 0 48-21.49 48-48v-90.98A192 192 0 00512 192 192 192 0 00320 0z" />
++  </>,
++  { mirror: true },
++);
++
++export const intersection = createIcon(
++  <>
++    <path
++      d="M48 128c-26.51 0-48 21.49-48 48v2.725h46.174a38.914 38.914 0 0110.443-8.668V128zm72.617 0v37h9.291a192 192 0 019.072-37zM0 242.725v42.668h37v-42.668zm0 106.668v42.666h37v-42.666zm384 23.627a192 192 0 01-37 9.072v9.967h37zM0 456.059V464c0 26.51 21.49 48 48 48h8.617v-42.059a38.927 38.927 0 01-14.17-13.882zm341.553 0a38.927 38.927 0 01-7.543 9.13V512H336c26.51 0 48-21.49 48-48v-7.941zM120.617 475v37h42.697v-37zm106.697 0v37h42.696v-37z"
++      fill="#fba94d"
++    />
++    <path
++      d="M287.547 0a194.725 194.725 0 00-80.365 33.285l27.006 27.006a157.2 157.2 0 0153.359-22.102V0zm64.908 0v38.19a157.2 157.2 0 0153.358 22.101l27.005-27.006A194.725 194.725 0 00352.455 0zm126.26 79.182l-27.004 27.004a157.2 157.2 0 0122.101 53.36H512a194.725 194.725 0 00-33.285-80.364zm-317.428.002A194.725 194.725 0 00128 159.547h38.19a157.2 157.2 0 0122.101-53.36l-27.004-27.003zm312.525 145.271a157.2 157.2 0 01-22.103 53.357l27.006 27.006A194.725 194.725 0 00512 224.455h-38.188zm-68 99.256a157.2 157.2 0 01-53.357 22.101V384a194.725 194.725 0 0080.361-33.285l-27.003-27.004z"
++      fill="#fba94d"
++    />
++    <path d="M138.982 128A192 192 0 00128 192a192 192 0 00192 192 192 192 0 0064-10.98V176c0-26.51-21.49-48-48-48z" />
++  </>,
++  { mirror: true },
++);
++
++export const exclusion = createIcon(
++  <>
++    <path d="M320 0a192 192 0 00-181.02 128H336c26.51 0 48 21.49 48 48v197.02A192 192 0 00512 192 192 192 0 00320 0zm64 373.02A192 192 0 01320 384a192 192 0 01-192-192 192 192 0 0110.98-64H48c-26.51 0-48 21.49-48 48v288c0 26.51 21.49 48 48 48h288c26.51 0 48-21.49 48-48v-90.98z" />
++  </>,
++  { mirror: true },
++);
++
++export const path = createIcon(
++  <>
++    <path
++      d="M255.1 434.776c60.857 121.313 279.98-20.551 219.124-111.533-39.406-58.92-291.258 67.998-392.526.705C-9.584 263.293 8.404 9.855 162.59 27.065c141.101 15.89 43.447 309.908 92.509 407.711z"
++      fill="none"
++      stroke="#000"
++      strokeWidth="52.578"
++      strokeLinecap="round"
++      strokeLinejoin="round"
++    />
++  </>,
++  { mirror: true },
++);
++
+ export const users = createIcon(
+   "M192 256c61.9 0 112-50.1 112-112S253.9 32 192 32 80 82.1 80 144s50.1 112 112 112zm76.8 32h-8.3c-20.8 10-43.9 16-68.5 16s-47.6-6-68.5-16h-8.3C51.6 288 0 339.6 0 403.2V432c0 26.5 21.5 48 48 48h288c26.5 0 48-21.5 48-48v-28.8c0-63.6-51.6-115.2-115.2-115.2zM480 256c53 0 96-43 96-96s-43-96-96-96-96 43-96 96 43 96 96 96zm48 32h-3.8c-13.9 4.8-28.6 8-44.2 8s-30.3-3.2-44.2-8H432c-20.4 0-39.2 5.9-55.7 15.4 24.4 26.3 39.7 61.2 39.7 99.8v38.4c0 2.2-.5 4.3-.6 6.4H592c26.5 0 48-21.5 48-48 0-61.9-50.1-112-112-112z",
+   { width: 640, height: 512, mirror: true },
+diff --git a/src/data/blob.ts b/src/data/blob.ts
+index 4d770e8cd562..e7e63de35318 100644
+--- a/src/data/blob.ts
++++ b/src/data/blob.ts
+@@ -1,6 +1,7 @@
+-import { getDefaultAppState } from "../appState";
++import { getDefaultAppState, cleanAppStateForExport } from "../appState";
+ import { restore } from "./restore";
+ import { t } from "../i18n";
++import { AppState } from "../types";
+ 
+ export const loadFromBlob = async (blob: any) => {
+   const updateAppState = (contents: string) => {
+@@ -13,7 +14,10 @@ export const loadFromBlob = async (blob: any) => {
+         throw new Error(t("alerts.couldNotLoadInvalidFile"));
+       }
+       elements = data.elements || [];
+-      appState = { ...defaultAppState, ...data.appState };
++      appState = {
++        ...defaultAppState,
++        ...cleanAppStateForExport(data.appState as Partial<AppState>),
++      };
+     } catch {
+       throw new Error(t("alerts.couldNotLoadInvalidFile"));
+     }
+diff --git a/src/data/index.ts b/src/data/index.ts
+index 74a01785004b..d50a1730a1a4 100644
+--- a/src/data/index.ts
++++ b/src/data/index.ts
+@@ -374,7 +374,7 @@ export const loadScene = async (id: string | null, privateKey?: string) => {
+ 
+   return {
+     elements: data.elements,
+-    appState: data.appState && { ...data.appState },
++    appState: data.appState,
+     commitToHistory: false,
+   };
+ };
+diff --git a/src/data/localStorage.ts b/src/data/localStorage.ts
+index d395a0e14a13..ec8aa08f09e9 100644
+--- a/src/data/localStorage.ts
++++ b/src/data/localStorage.ts
+@@ -1,6 +1,6 @@
+ import { ExcalidrawElement } from "../element/types";
+ import { AppState, LibraryItems } from "../types";
+-import { clearAppStateForLocalStorage } from "../appState";
++import { clearAppStateForLocalStorage, getDefaultAppState } from "../appState";
+ import { restore } from "./restore";
+ 
+ const LOCAL_STORAGE_KEY = "excalidraw";
+@@ -111,7 +111,8 @@ export const restoreFromLocalStorage = () => {
+   if (savedElements) {
+     try {
+       elements = JSON.parse(savedElements);
+-    } catch {
++    } catch (error) {
++      console.error(error);
+       // Do nothing because elements array is already empty
+     }
+   }
+@@ -119,3 +120,3 @@ export const restoreFromLocalStorage = () => {
+   let appState = null;
+   if (savedState) {
+     try {
+
++      appState = {
++        ...getDefaultAppState(),
++        ...clearAppStateForLocalStorage(
++          JSON.parse(savedState) as Partial<AppState>,
++        ),
++      };
++    } catch (error) {
++      console.error(error);
+       // Do nothing because appState is already null
+     }
+   }
+diff --git a/src/data/restore.ts b/src/data/restore.ts
+index 0413e914b9d4..b9cdccb78f38 100644
+--- a/src/data/restore.ts
++++ b/src/data/restore.ts
+@@ -82,6 +82,11 @@ const migrateElement = (
+         textAlign: element.textAlign || DEFAULT_TEXT_ALIGN,
+         verticalAlign: element.verticalAlign || DEFAULT_VERTICAL_ALIGN,
+       });
++    case "path":
++      return migrateElementWithProperties(element, {
++        d: element.d,
++        hollow: element.hollow,
++      });
+     case "draw":
+     case "line":
+     case "arrow": {
+diff --git a/src/element/collision.ts b/src/element/collision.ts
+index 79fa4f383c8e..b1da53e23b24 100644
+--- a/src/element/collision.ts
++++ b/src/element/collision.ts
+@@ -1,10 +1,12 @@
+ import {
+   distanceBetweenPointAndSegment,
++  distanceFromPointToPath,
+   isPathALoop,
+   rotate,
+   isPointInPolygon,
+ } from "../math";
+ import { pointsOnBezierCurves } from "points-on-curve";
++import { isPointInsidePath } from "./path/raphael";
+ 
+ import { NonDeletedExcalidrawElement } from "./types";
+ 
+@@ -208,6 +210,19 @@ export const hitTest = (
+     );
+   } else if (element.type === "text") {
+     return x >= x1 && x <= x2 && y >= y1 && y <= y2;
++  } else if (element.type === "path") {
++    if (isElementDraggableFromInside(element, appState)) {
++      return (
++        isPointInsidePath(element.d, x - element.x, y - element.y) ||
++        distanceFromPointToPath(element.d, [x - element.x, y - element.y]) <
++          lineThreshold
++      );
++    }
++
++    return (
++      distanceFromPointToPath(element.d, [x - element.x, y - element.y]) <
++      lineThreshold
++    );
+   } else if (element.type === "selection") {
+     console.warn("This should not happen, we need to investigate why it does.");
+     return false;
+diff --git a/src/element/index.ts b/src/element/index.ts
+index ec3c5df4f2c9..5fdd84006613 100644
+--- a/src/element/index.ts
++++ b/src/element/index.ts
+@@ -5,12 +5,15 @@ import {
+ } from "./types";
+ import { isInvisiblySmallElement } from "./sizeHelpers";
+ 
++export { operateBool } from "./path/bools";
++
+ export {
+   newElement,
+   newTextElement,
+   updateTextElement,
+   newLinearElement,
+   duplicateElement,
++  newPathElement,
+ } from "./newElement";
+ export {
+   getElementAbsoluteCoords,
+diff --git a/src/element/newElement.ts b/src/element/newElement.ts
+index bae1792fd8ef..5558ef2a7ce6 100644
+--- a/src/element/newElement.ts
++++ b/src/element/newElement.ts
+@@ -2,6 +2,7 @@ import {
+   ExcalidrawElement,
+   ExcalidrawTextElement,
+   ExcalidrawLinearElement,
++  ExcalidrawPathElement,
+   ExcalidrawGenericElement,
+   NonDeleted,
+   TextAlign,
+@@ -220,6 +221,19 @@ export const newLinearElement = (
+   };
+ };
+ 
++export function newPathElement(
++  opts: {
++    d: string;
++    hollow?: boolean;
++  } & ElementConstructorOpts,
++): NonDeleted<ExcalidrawPathElement> {
++  return {
++    ..._newElementBase<ExcalidrawPathElement>("path", opts),
++    d: opts.d || "",
++    hollow: opts.hollow || false,
++  };
++}
++
+ // Simplified deep clone for the purpose of cloning ExcalidrawElement only
+ //  (doesn't clone Date, RegExp, Map, Set, Typed arrays etc.)
+ //
+diff --git a/src/element/path/Matrix.ts b/src/element/path/Matrix.ts
+new file mode 100644
+index 000000000000..d5753338d7e4
+--- /dev/null
++++ b/src/element/path/Matrix.ts
+@@ -0,0 +1,135 @@
++function rad(deg: number) {
++  return ((deg % 360) * Math.PI) / 180;
++}
++
++export default class Matrix {
++  a: number = 1;
++  b: number = 0;
++  c: number = 0;
++  d: number = 1;
++  e: number = 0;
++  f: number = 0;
++
++  /*\
++    * Matrix.add
++    [ method ]
++    **
++    * Adds given matrix to existing one.
++    > Parameters
++    - a (number)
++    - b (number)
++    - c (number)
++    - d (number)
++    - e (number)
++    - f (number)
++    or
++    - matrix (object) @Matrix
++  \*/
++  add(a: number, b: number, c: number, d: number, e: number, f: number) {
++    const out: [number?, number?, number?][] = [[], [], []];
++    const m = [
++      [this.a, this.c, this.e],
++      [this.b, this.d, this.f],
++      [0, 0, 1],
++    ];
++    const matrix = [
++      [a, c, e],
++      [b, d, f],
++      [0, 0, 1],
++    ];
++
++    for (let x = 0; x < 3; x++) {
++      for (let y = 0; y < 3; y++) {
++        let res = 0;
++        for (let z = 0; z < 3; z++) {
++          res += m[x][z] * matrix[z][y];
++        }
++        out[x][y] = res;
++      }
++    }
++
++    this.a = out[0][0] as number;
++    this.b = out[1][0] as number;
++    this.c = out[0][1] as number;
++    this.d = out[1][1] as number;
++    this.e = out[0][2] as number;
++    this.f = out[1][2] as number;
++  }
++  /*\
++    * Matrix.translate
++    [ method ]
++    **
++    * Translate the matrix
++    > Parameters
++    - x (number)
++    - y (number)
++  \*/
++  translate(x: number, y: number) {
++    this.add(1, 0, 0, 1, x, y);
++  }
++  /*\
++    * Matrix.rotate
++    [ method ]
++    **
++    * Rotates the matrix
++    > Parameters
++    - a (number)
++    - x (number)
++    - y (number)
++  \*/
++  rotate(a: number, x: number, y: number) {
++    a = rad(a);
++    x = x || 0;
++    y = y || 0;
++    const cos = +Math.cos(a).toFixed(9);
++    const sin = +Math.sin(a).toFixed(9);
++
++    this.add(cos, sin, -sin, cos, x, y);
++    this.add(1, 0, 0, 1, -x, -y);
++  }
++
++  /*\
++    * Matrix.scale
++    [ method ]
++    **
++    * Scales the matrix
++    > Parameters
++    - x (number)
++    - y (number) #optional
++    - cx (number) #optional
++    - cy (number) #optional
++  \*/
++  scale(x: number, y: number, cx: number, cy: number) {
++    y == null && (y = x);
++    (cx || cy) && this.add(1, 0, 0, 1, cx, cy);
++    this.add(x, 0, 0, y, 0, 0);
++    (cx || cy) && this.add(1, 0, 0, 1, -cx, -cy);
++  }
++
++  /*\
++    * Matrix.x
++    [ method ]
++    **
++    * Return x coordinate for given point after transformation described by the matrix. See also @Matrix.y
++    > Parameters
++    - x (number)
++    - y (number)
++    = (number) x
++  \*/
++  x(x: number, y: number) {
++    return x * this.a + y * this.c + this.e;
++  }
++  /*\
++    * Matrix.y
++    [ method ]
++    **
++    * Return y coordinate for given point after transformation described by the matrix. See also @Matrix.x
++    > Parameters
++    - x (number)
++    - y (number)
++    = (number) y
++  \*/
++  y(x: number, y: number) {
++    return x * this.b + y * this.d + this.f;
++  }
++}
+diff --git a/src/element/path/Path.ts b/src/element/path/Path.ts
+new file mode 100644
+index 000000000000..58b812c681ee
+--- /dev/null
++++ b/src/element/path/Path.ts
+@@ -0,0 +1,257 @@
++import { ExcalidrawElement } from "../types";
++import {
++  difference,
++  union,
++  intersection,
++  exclusion,
++  pathArrToStr,
++} from "./raphaelBools";
++import {
++  parsePathString,
++  getTotalLength,
++  getPointAtLength,
++  normalizePath,
++  pathDimensions,
++} from "./raphael";
++import Matrix from "./Matrix";
++import { Point } from "../../types";
++
++function isHollow(path: (string | number)[][]) {
++  const index = path.findIndex(
++    ([c], i) => i > 0 && (c as string).toLowerCase() === "m",
++  );
++
++  const head = path[0];
++  const tail = path[index - 1];
++
++  return !!(
++    tail &&
++    tail[tail.length - 1] === head[head.length - 1] &&
++    tail[tail.length - 2] === head[head.length - 2]
++  );
++}
++
++interface Transform {
++  translate?: number[];
++  scale?: number[];
++  rotate?: number;
++}
++
++function toMarix(transform: Transform, centerPoint: Point) {
++  const matrix = new Matrix();
++
++  if (transform.translate) {
++    matrix.translate(...(transform.translate as [number, number]));
++  }
++
++  if (transform.rotate) {
++    matrix.rotate(transform.rotate as number, ...centerPoint);
++  }
++
++  if (transform.scale) {
++    const [scaleX, scaleY] = transform.scale;
++
++    matrix.scale(scaleX, scaleY, 0, 0);
++  }
++
++  return matrix;
++}
++
++export default class Path {
++  data: (string | number)[][];
++  isHollow: boolean = false;
++
++  constructor(d: string | ExcalidrawElement) {
++    this.data = typeof d === "string" ? parsePathString(d) : this.toPath(d);
++  }
++
++  mapPath(matrix: Matrix) {
++    this.data.forEach((path) => {
++      for (let i = 1; i < path.length; i += 2) {
++        const n1 = path[i] as number;
++        const n2 = path[i + 1] as number;
++        const newX = matrix.x(n1, n2);
++        const newY = matrix.y(n1, n2);
++        path[i] = newX;
++        path[i + 1] = newY;
++      }
++    });
++  }
++
++  getBoundingBox() {
++    return pathDimensions(this.data);
++  }
++
++  getCenterPoint(): Point {
++    const box = this.getBoundingBox();
++
++    return [box.x + box.width / 2, box.y + box.height / 2];
++  }
++
++  transformPoint(point: Point, transform: Transform = {}): Point {
++    const matrix = toMarix(transform, this.getCenterPoint());
++
++    const newX = matrix.x(...point);
++    const newY = matrix.y(...point);
++
++    return [newX, newY];
++  }
++
++  transform(transform: Transform = {}) {
++    const matrix = toMarix(transform, this.getCenterPoint());
++
++    this.mapPath(matrix);
++  }
++
++  toPathString() {
++    return pathArrToStr(this.data);
++  }
++
++  /**
++   * perform a difference of the two given paths
++   *
++   * @param object el1 (RaphaelJS element)
++   * @param object el2 (RaphaelJS element)
++   *
++   * @returns string (path string)
++   */
++  difference(path: Path) {
++    const { data, intersections } = difference(this.data, path.data);
++
++    this.data = data;
++    this.isHollow = isHollow(this.data);
++
++    return intersections;
++  }
++
++  /**
++   * perform a union of the two given paths
++   *
++   * @param object el1 (RaphaelJS element)
++   * @param object el2 (RaphaelJS element)
++   *
++   * @returns string (path string)
++   */
++  union(path: Path) {
++    const { data, intersections } = union(this.data, path.data);
++    this.data = data;
++    this.isHollow = isHollow(this.data);
++
++    return intersections;
++  }
++
++  /**
++   * perform a intersection of the two given paths
++   *
++   * @param object el1 (RaphaelJS element)
++   * @param object el2 (RaphaelJS element)
++   *
++   * @returns string (path string)
++   */
++  intersection(path: Path) {
++    const { data, intersections } = intersection(this.data, path.data);
++
++    this.data = data;
++    this.isHollow = isHollow(this.data);
++
++    return intersections;
++  }
++
++  /**
++   * perform a exclusion of the two given paths
++   *
++   * @param object el1 (RaphaelJS element)
++   * @param object el2 (RaphaelJS element)
++   *
++   * @returns string (path string)
++   */
++  exclusion(path: Path) {
++    const { data, intersections } = exclusion(this.data, path.data);
++
++    this.data = data;
++    this.isHollow = isHollow(this.data);
++
++    return intersections;
++  }
++
++  getTotalLength(): number {
++    return getTotalLength(this.data) as number;
++  }
++
++  getPointAtLength(length: number) {
++    return getPointAtLength(this.data, length);
++  }
++
++  toPath(element: ExcalidrawElement) {
++    const path = [];
++    const x = element.width / 2;
++    const y = element.height / 2;
++    let cornerPoints: [number, number][] = [];
++    let rx = 0;
++    let ry = 0;
++
++    if (element.type === "ellipse") {
++      rx = element.width / 2;
++      ry = element.height / 2;
++      cornerPoints = [
++        [x - rx, y - ry],
++        [x + rx, y - ry],
++        [x + rx, y + ry],
++        [x - rx, y + ry],
++      ];
++    }
++
++    const radiusShift = [
++      [
++        [0, 1],
++        [1, 0],
++      ],
++      [
++        [-1, 0],
++        [0, 1],
++      ],
++      [
++        [0, -1],
++        [-1, 0],
++      ],
++      [
++        [1, 0],
++        [0, -1],
++      ],
++    ];
++    //iterate all corners
++    for (let i = 0; i <= 3; i++) {
++      //insert starting point
++      if (i === 0) {
++        path.push(["M", cornerPoints[0][0], cornerPoints[0][1] + ry]);
++      }
++
++      //insert "curveto" (radius factor .446 is taken from Inkscape)
++      if (rx > 0) {
++        path.push([
++          "C",
++          cornerPoints[i][0] + radiusShift[i][0][0] * rx * 0.446,
++          cornerPoints[i][1] + radiusShift[i][0][1] * ry * 0.446,
++          cornerPoints[i][0] + radiusShift[i][1][0] * rx * 0.446,
++          cornerPoints[i][1] + radiusShift[i][1][1] * ry * 0.446,
++          cornerPoints[i][0] + radiusShift[i][1][0] * rx,
++          cornerPoints[i][1] + radiusShift[i][1][1] * ry,
++        ]);
++      }
++
++      if (i === 3) {
++        path.push(["Z"]);
++      }
++    }
++
++    return normalizePath(pathArrToStr(path));
++  }
++
++  static clone(path: Path): Path {
++    const clone = new Path(path.toPathString());
++
++    clone.isHollow = path.isHollow;
++
++    return clone;
++  }
++}
+diff --git a/src/element/path/bools.ts b/src/element/path/bools.ts
+new file mode 100644
+index 000000000000..f845155b583c
+--- /dev/null
++++ b/src/element/path/bools.ts
+@@ -0,0 +1,240 @@
++import { Drawable } from "roughjs/bin/core";
++import { RoughCanvas } from "roughjs/bin/canvas";
++
++import { newPathElement } from "../index";
++import { ExcalidrawElement, NonDeletedExcalidrawElement } from "../types";
++import { Point } from "../../types";
++import { generateElementShape } from "../../renderer/renderElement";
++import { getElementBounds, getElementAbsoluteCoords } from "../bounds";
++import { radianToDegree, rotate } from "../../math";
++
++import Path from "./Path";
++
++function normalizeShape(shape: Drawable) {
++  shape.sets = shape.sets
++    .filter(({ type }) => type === "path")
++    .map((set) => {
++      // De-duplicated paths
++      switch (shape.shape) {
++        case "ellipse":
++          set.ops = set.ops.slice(
++            0,
++            set.ops.findIndex(({ op }, i) => i > 0 && op === "move"),
++          );
++
++          const last = set.ops.pop();
++
++          // close the path
++          if (last) {
++            set.ops.push({
++              ...last,
++              data: [
++                ...last.data.slice(0, last.data.length - 2),
++                ...set.ops[0].data,
++              ],
++            });
++          }
++          break;
++        case "curve":
++          set.ops = set.ops.slice(
++            0,
++            set.ops.findIndex(({ op }, i) => i > 0 && op === "move"),
++          );
++          break;
++        default:
++          set.ops = set.ops.filter((_, i) => {
++            return i === 0 || i % 4 === 1;
++          });
++      }
++
++      return set;
++    });
++
++  return shape;
++}
++
++function objectToPath(rc: RoughCanvas, element: ExcalidrawElement) {
++  const shape = generateElementShape(
++    {
++      ...element,
++      roughness: 0,
++    } as NonDeletedExcalidrawElement,
++    rc.generator,
++  );
++  let path = null;
++
++  if (element.type !== "path") {
++    switch (element.type) {
++      case "ellipse":
++        path = new Path(element);
++        break;
++      case "line": {
++        const normalizedShape = normalizeShape((shape as Drawable[])[0]);
++
++        const [p] = rc.generator.toPaths(normalizedShape);
++
++        path = new Path(p.d);
++
++        break;
++      }
++      default:
++        const normalizedShape = normalizeShape(shape as Drawable);
++
++        const [p] = rc.generator.toPaths(normalizedShape);
++
++        path = new Path(p.d);
++    }
++  } else {
++    path = new Path(element.d);
++  }
++
++  return path;
++}
++
++function curveToPoint(move: Point, element: ExcalidrawElement): Point {
++  const [x1, y1, x2, y2] = getElementAbsoluteCoords(element);
++  const cx = (x1 + x2) / 2;
++  const cy = (y1 + y2) / 2;
++
++  const transformXY = (x: number, y: number) =>
++    rotate(element.x + x, element.y + y, cx, cy, element.angle);
++
++  return transformXY(...move);
++}
++
++function findIndex(path: Path, move: Point) {
++  return path.data.findIndex(
++    (c) => c[c.length - 2] === move[0] && c[c.length - 1] === move[1],
++  );
++}
++
++function getShiftXY(
++  originPaths: [Path, Path],
++  paths: [Path, Path],
++): { move: Point; moveIndex: number; pathIndex: number } {
++  let move: Point = [0, 0];
++  let moveIndex: number = -1;
++  const pathIndex: number = 0;
++
++  for (let i = 0; i < 2; i++) {
++    const path = paths[i];
++
++    for (let j = 0; j < path.data.length; j++) {
++      const seg = path.data[j];
++      move = [seg[seg.length - 2], seg[seg.length - 1]] as [number, number];
++      moveIndex = findIndex(originPaths[i], move);
++
++      if (moveIndex !== -1) {
++        return {
++          move,
++          moveIndex,
++          pathIndex: i,
++        };
++      }
++    }
++  }
++
++  return {
++    move,
++    moveIndex,
++    pathIndex,
++  };
++}
++
++export function operateBool(
++  element1: NonDeletedExcalidrawElement,
++  element2: NonDeletedExcalidrawElement,
++  rc: RoughCanvas,
++  action: "difference" | "union" | "intersection" | "exclusion",
++): NonDeletedExcalidrawElement {
++  const [x1, y1] = getElementBounds(element1);
++  const [x2, y2] = getElementBounds(element2);
++
++  const offsetX = Math.min(x1, x2);
++  const offsetY = Math.min(y1, y2);
++
++  const transform1 = {
++    translate: [element1.x - offsetX, element1.y - offsetY],
++    rotate: radianToDegree(element1.angle),
++  };
++  const transform2 = {
++    translate: [element2.x - offsetX, element2.y - offsetY],
++    rotate: radianToDegree(element2.angle),
++  };
++
++  const path1 = objectToPath(rc, element1);
++  const path2 = objectToPath(rc, element2);
++
++  const paths: [Path, Path] = [path1, path2];
++  const elements: [ExcalidrawElement, ExcalidrawElement] = [element1, element2];
++  const transforms = [transform1, transform2];
++
++  paths.forEach((p, i) => p.transform(transforms[i]));
++
++  const originPaths: [Path, Path] = [Path.clone(path1), Path.clone(path2)];
++
++  const [intersection] = path1[action](path2);
++
++  if (!path1.data.length) {
++    return (null as unknown) as NonDeletedExcalidrawElement;
++  }
++
++  let move: Point = [0, 0];
++  let moveIndex: number = -1;
++  let pathIndex: number = 0;
++
++  if (intersection) {
++    move = [intersection.x, intersection.y];
++    moveIndex = findIndex(path1, move);
++  } else {
++    ({ move, moveIndex, pathIndex } = getShiftXY(originPaths, paths));
++  }
++
++  const isPath2InsidePath1 =
++    !intersection &&
++    path1.data[0][1] === path2.data[0][1] &&
++    path1.data[0][2] === path2.data[0][2];
++  const element = elements[pathIndex];
++  const transform = transforms[pathIndex];
++
++  path1.transform({
++    rotate: -transform.rotate,
++  });
++
++  const box = path1.getBoundingBox();
++
++  path1.transform({
++    translate: [-box.x, -box.y],
++  });
++
++  const temp = newPathElement({
++    ...element,
++    width: box.width,
++    height: box.height,
++    d: path1.toPathString(),
++    hollow: path1.isHollow,
++  });
++
++  let [p1x, p1y] = [0, 0];
++  let [p2x, p2y] = [0, 0];
++
++  if (!isPath2InsidePath1) {
++    [p1x, p1y] = curveToPoint(
++      originPaths[pathIndex].transformPoint(move, {
++        translate: transform.translate.map((p) => -p),
++        rotate: -transform.rotate,
++      }),
++      element,
++    );
++    [p2x, p2y] = curveToPoint(
++      paths[pathIndex].data[moveIndex].slice(-2) as [number, number],
++      temp,
++    );
++  }
++
++  return newPathElement({
++    ...temp,
++    x: temp.x - (p2x - p1x),
++    y: temp.y - (p2y - p1y),
++  });
++}
+diff --git a/src/element/path/raphael.js b/src/element/path/raphael.js
+new file mode 100644
+index 000000000000..91027bff0210
+--- /dev/null
++++ b/src/element/path/raphael.js
+@@ -0,0 +1,601 @@
++// Ported from Raphaeljs
++// https://github.com/DmitryBaranovskiy/raphael
++
++const pathCommand = /([achlmrqstvz])[\s,]*((-?\d*\.?\d*(?:e[-+]?\d+)?[\s]*,?[\s]*)+)/gi;
++const pathValues = /(-?\d*\.?\d*(?:e[-+]?\d+)?)[\s]*,?[\s]*/gi;
++const notcurvepath = /,?([achlqrstvx]),?/i;
++
++function findDotAtSegment(p1x, p1y, c1x, c1y, c2x, c2y, p2x, p2y, t) {
++  var t1 = 1 - t;
++  return {
++    x:
++      Math.pow(t1, 3) * p1x +
++      Math.pow(t1, 2) * 3 * t * c1x +
++      t1 * 3 * t * t * c2x +
++      Math.pow(t, 3) * p2x,
++    y:
++      Math.pow(t1, 3) * p1y +
++      Math.pow(t1, 2) * 3 * t * c1y +
++      t1 * 3 * t * t * c2y +
++      Math.pow(t, 3) * p2y,
++  };
++}
++
++function curveDim(p1x, p1y, c1x, c1y, c2x, c2y, p2x, p2y) {
++  var a = c2x - 2 * c1x + p1x - (p2x - 2 * c2x + c1x),
++    b = 2 * (c1x - p1x) - 2 * (c2x - c1x),
++    c = p1x - c1x,
++    t1 = (-b + Math.sqrt(b * b - 4 * a * c)) / 2 / a,
++    t2 = (-b - Math.sqrt(b * b - 4 * a * c)) / 2 / a,
++    y = [p1y, p2y],
++    x = [p1x, p2x],
++    dot;
++  Math.abs(t1) > "1e12" && (t1 = 0.5);
++  Math.abs(t2) > "1e12" && (t2 = 0.5);
++  if (t1 > 0 && t1 < 1) {
++    dot = findDotAtSegment(p1x, p1y, c1x, c1y, c2x, c2y, p2x, p2y, t1);
++    x.push(dot.x);
++    y.push(dot.y);
++  }
++  if (t2 > 0 && t2 < 1) {
++    dot = findDotAtSegment(p1x, p1y, c1x, c1y, c2x, c2y, p2x, p2y, t2);
++    x.push(dot.x);
++    y.push(dot.y);
++  }
++  a = c2y - 2 * c1y + p1y - (p2y - 2 * c2y + c1y);
++  b = 2 * (c1y - p1y) - 2 * (c2y - c1y);
++  c = p1y - c1y;
++  t1 = (-b + Math.sqrt(b * b - 4 * a * c)) / 2 / a;
++  t2 = (-b - Math.sqrt(b * b - 4 * a * c)) / 2 / a;
++  Math.abs(t1) > "1e12" && (t1 = 0.5);
++  Math.abs(t2) > "1e12" && (t2 = 0.5);
++  if (t1 > 0 && t1 < 1) {
++    dot = findDotAtSegment(p1x, p1y, c1x, c1y, c2x, c2y, p2x, p2y, t1);
++    x.push(dot.x);
++    y.push(dot.y);
++  }
++  if (t2 > 0 && t2 < 1) {
++    dot = findDotAtSegment(p1x, p1y, c1x, c1y, c2x, c2y, p2x, p2y, t2);
++    x.push(dot.x);
++    y.push(dot.y);
++  }
++  return {
++    min: { x: Math.min.apply(0, x), y: Math.min.apply(0, y) },
++    max: { x: Math.max.apply(0, x), y: Math.max.apply(0, y) },
++  };
++}
++
++function bezierBBox(params) {
++  var bbox = curveDim(...params);
++
++  return {
++    x: bbox.min.x,
++    y: bbox.min.y,
++    x2: bbox.max.x,
++    y2: bbox.max.y,
++    width: bbox.max.x - bbox.min.x,
++    height: bbox.max.y - bbox.min.y,
++  };
++}
++
++function isPointInsideBBox(bbox, x, y) {
++  return x >= bbox.x && x <= bbox.x2 && y >= bbox.y && y <= bbox.y2;
++}
++
++function isBBoxIntersect(bbox1, bbox2) {
++  return (
++    isPointInsideBBox(bbox2, bbox1.x, bbox1.y) ||
++    isPointInsideBBox(bbox2, bbox1.x2, bbox1.y) ||
++    isPointInsideBBox(bbox2, bbox1.x, bbox1.y2) ||
++    isPointInsideBBox(bbox2, bbox1.x2, bbox1.y2) ||
++    isPointInsideBBox(bbox1, bbox2.x, bbox2.y) ||
++    isPointInsideBBox(bbox1, bbox2.x2, bbox2.y) ||
++    isPointInsideBBox(bbox1, bbox2.x, bbox2.y2) ||
++    isPointInsideBBox(bbox1, bbox2.x2, bbox2.y2) ||
++    (((bbox1.x < bbox2.x2 && bbox1.x > bbox2.x) ||
++      (bbox2.x < bbox1.x2 && bbox2.x > bbox1.x)) &&
++      ((bbox1.y < bbox2.y2 && bbox1.y > bbox2.y) ||
++        (bbox2.y < bbox1.y2 && bbox2.y > bbox1.y)))
++  );
++}
++
++function base3(t, p1, p2, p3, p4) {
++  var t1 = -3 * p1 + 9 * p2 - 9 * p3 + 3 * p4,
++    t2 = t * t1 + 6 * p1 - 12 * p2 + 6 * p3;
++  return t * t2 - 3 * p1 + 3 * p2;
++}
++
++function bezlen(x1, y1, x2, y2, x3, y3, x4, y4, z) {
++  if (z == null) {
++    z = 1;
++  }
++  z = z > 1 ? 1 : z < 0 ? 0 : z;
++  var z2 = z / 2,
++    n = 12,
++    Tvalues = [
++      -0.1252,
++      0.1252,
++      -0.3678,
++      0.3678,
++      -0.5873,
++      0.5873,
++      -0.7699,
++      0.7699,
++      -0.9041,
++      0.9041,
++      -0.9816,
++      0.9816,
++    ],
++    Cvalues = [
++      0.2491,
++      0.2491,
++      0.2335,
++      0.2335,
++      0.2032,
++      0.2032,
++      0.1601,
++      0.1601,
++      0.1069,
++      0.1069,
++      0.0472,
++      0.0472,
++    ],
++    sum = 0;
++  for (var i = 0; i < n; i++) {
++    var ct = z2 * Tvalues[i] + z2,
++      xbase = base3(ct, x1, x2, x3, x4),
++      ybase = base3(ct, y1, y2, y3, y4),
++      comb = xbase * xbase + ybase * ybase;
++    sum += Cvalues[i] * Math.sqrt(comb);
++  }
++  return z2 * sum;
++}
++
++function intersect(x1, y1, x2, y2, x3, y3, x4, y4) {
++  if (
++    Math.max(x1, x2) < Math.min(x3, x4) ||
++    Math.min(x1, x2) > Math.max(x3, x4) ||
++    Math.max(y1, y2) < Math.min(y3, y4) ||
++    Math.min(y1, y2) > Math.max(y3, y4)
++  ) {
++    return;
++  }
++  var nx = (x1 * y2 - y1 * x2) * (x3 - x4) - (x1 - x2) * (x3 * y4 - y3 * x4),
++    ny = (x1 * y2 - y1 * x2) * (y3 - y4) - (y1 - y2) * (x3 * y4 - y3 * x4),
++    denominator = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
++
++  if (!denominator) {
++    return;
++  }
++  var px = nx / denominator,
++    py = ny / denominator,
++    px2 = +px.toFixed(2),
++    py2 = +py.toFixed(2);
++  if (
++    px2 < +Math.min(x1, x2).toFixed(2) ||
++    px2 > +Math.max(x1, x2).toFixed(2) ||
++    px2 < +Math.min(x3, x4).toFixed(2) ||
++    px2 > +Math.max(x3, x4).toFixed(2) ||
++    py2 < +Math.min(y1, y2).toFixed(2) ||
++    py2 > +Math.max(y1, y2).toFixed(2) ||
++    py2 < +Math.min(y3, y4).toFixed(2) ||
++    py2 > +Math.max(y3, y4).toFixed(2)
++  ) {
++    return;
++  }
++  return { x: px, y: py };
++}
++
++function interHelper(bez1, bez2) {
++  var bbox1 = bezierBBox(bez1),
++    bbox2 = bezierBBox(bez2);
++
++  if (!isBBoxIntersect(bbox1, bbox2)) {
++    return [];
++  }
++
++  var l1 = bezlen.apply(0, bez1),
++    l2 = bezlen.apply(0, bez2),
++    n1 = Math.max(~~(l1 / 5), 1),
++    n2 = Math.max(~~(l2 / 5), 1),
++    dots1 = [],
++    dots2 = [],
++    xy = {},
++    res = [];
++  for (var i = 0; i < n1 + 1; i++) {
++    var p = findDotsAtSegment(...bez1.concat(i / n1));
++    dots1.push({ x: p.x, y: p.y, t: i / n1 });
++  }
++  for (i = 0; i < n2 + 1; i++) {
++    p = findDotsAtSegment(...bez2.concat(i / n2));
++    dots2.push({ x: p.x, y: p.y, t: i / n2 });
++  }
++  for (i = 0; i < n1; i++) {
++    for (var j = 0; j < n2; j++) {
++      var di = dots1[i],
++        di1 = dots1[i + 1],
++        dj = dots2[j],
++        dj1 = dots2[j + 1],
++        ci = Math.abs(di1.x - di.x) < 0.001 ? "y" : "x",
++        cj = Math.abs(dj1.x - dj.x) < 0.001 ? "y" : "x",
++        is = intersect(di.x, di.y, di1.x, di1.y, dj.x, dj.y, dj1.x, dj1.y);
++      if (is) {
++        if (xy[is.x.toFixed(4)] === is.y.toFixed(4)) {
++          continue;
++        }
++        xy[is.x.toFixed(4)] = is.y.toFixed(4);
++        var t1 =
++            di.t +
++            Math.abs((is[ci] - di[ci]) / (di1[ci] - di[ci])) * (di1.t - di.t),
++          t2 =
++            dj.t +
++            Math.abs((is[cj] - dj[cj]) / (dj1[cj] - dj[cj])) * (dj1.t - dj.t);
++        if (t1 >= 0 && t1 <= 1.001 && t2 >= 0 && t2 <= 1.001) {
++          res.push({
++            x: is.x,
++            y: is.y,
++            t1: Math.min(t1, 1),
++            t2: Math.min(t2, 1),
++          });
++        }
++      }
++    }
++  }
++
++  return res;
++}
++
++function l2c(x1, y1, x2, y2) {
++  return [x1, y1, x2, y2, x2, y2];
++}
++
++function _path2curve(path) {
++  var attrs = { x: 0, y: 0, bx: 0, by: 0, X: 0, Y: 0, qx: null, qy: null },
++    processPath = function (path, d) {
++      var tq = { T: 1, Q: 1 };
++      if (!path) {
++        return ["C", d.x, d.y, d.x, d.y, d.x, d.y];
++      }
++      !(path[0] in tq) && (d.qx = d.qy = null);
++      switch (path[0]) {
++        case "M":
++          d.X = path[1];
++          d.Y = path[2];
++          break;
++        case "L":
++          path = ["C"].concat(l2c(d.x, d.y, path[1], path[2]));
++          break;
++        case "H":
++          path = ["C"].concat(l2c(d.x, d.y, path[1], d.y));
++          break;
++        case "Z":
++          path = ["C"].concat(l2c(d.x, d.y, d.X, d.Y));
++          break;
++        default:
++      }
++      return path;
++    },
++    pcoms1 = [], // path commands of original path p
++    pfirst = "", // temporary holder for original path command
++    pcom = ""; // holder for previous path command of original path
++  for (var i = 0, ii = path.length; i < ii; i++) {
++    path[i] && (pfirst = path[i][0]); // save current path command
++
++    if (pfirst !== "C") {
++      // C is not saved yet, because it may be result of conversion
++      pcoms1[i] = pfirst; // Save current path command
++      i && (pcom = pcoms1[i - 1]); // Get previous path command pcom
++    }
++    path[i] = processPath(path[i], attrs, pcom); // Previous path command is inputted to processPath
++
++    if (pcoms1[i] !== "A" && pfirst === "C") {
++      pcoms1[i] = "C";
++    } // A is the only command
++    // which may produce multiple C:s
++    // so we have to make sure that C is also C in original path
++
++    var seg = path[i],
++      seglen = seg.length;
++    attrs.x = seg[seglen - 2];
++    attrs.y = seg[seglen - 1];
++    attrs.bx = parseFloat(seg[seglen - 4]) || attrs.x;
++    attrs.by = parseFloat(seg[seglen - 3]) || attrs.y;
++  }
++  return path;
++}
++
++function getTatLen(x1, y1, x2, y2, x3, y3, x4, y4, ll) {
++  if (ll < 0 || bezlen(x1, y1, x2, y2, x3, y3, x4, y4) < ll) {
++    return;
++  }
++  var t = 1,
++    step = t / 2,
++    t2 = t - step,
++    l,
++    e = 0.01;
++  l = bezlen(x1, y1, x2, y2, x3, y3, x4, y4, t2);
++  while (Math.abs(l - ll) > e) {
++    step /= 2;
++    t2 += (l < ll ? 1 : -1) * step;
++    l = bezlen(x1, y1, x2, y2, x3, y3, x4, y4, t2);
++  }
++  return t2;
++}
++
++function getPointAtSegmentLength(
++  p1x,
++  p1y,
++  c1x,
++  c1y,
++  c2x,
++  c2y,
++  p2x,
++  p2y,
++  length,
++) {
++  if (length == null) {
++    return bezlen(p1x, p1y, c1x, c1y, c2x, c2y, p2x, p2y);
++  }
++  return findDotsAtSegment(
++    p1x,
++    p1y,
++    c1x,
++    c1y,
++    c2x,
++    c2y,
++    p2x,
++    p2y,
++    getTatLen(p1x, p1y, c1x, c1y, c2x, c2y, p2x, p2y, length),
++  );
++}
++
++export function pathIntersection(path1, path2) {
++  path1 = normalizePath(path1);
++  path2 = normalizePath(path2);
++
++  var x1,
++    y1,
++    x2,
++    y2,
++    x1m,
++    y1m,
++    x2m,
++    y2m,
++    bez1,
++    bez2,
++    res = [];
++
++  for (var i = 0, ii = path1.length; i < ii; i++) {
++    var pi = path1[i];
++    if (pi[0] === "M") {
++      x1 = x1m = pi[1];
++      y1 = y1m = pi[2];
++    } else {
++      if (pi[0] === "C") {
++        bez1 = [x1, y1].concat(pi.slice(1));
++        x1 = bez1[6];
++        y1 = bez1[7];
++      } else {
++        bez1 = [x1, y1, x1, y1, x1m, y1m, x1m, y1m];
++        x1 = x1m;
++        y1 = y1m;
++      }
++      for (var j = 0, jj = path2.length; j < jj; j++) {
++        var pj = path2[j];
++        if (pj[0] === "M") {
++          x2 = x2m = pj[1];
++          y2 = y2m = pj[2];
++        } else {
++          if (pj[0] === "C") {
++            bez2 = [x2, y2].concat(pj.slice(1));
++            x2 = bez2[6];
++            y2 = bez2[7];
++          } else {
++            bez2 = [x2, y2, x2, y2, x2m, y2m, x2m, y2m];
++            x2 = x2m;
++            y2 = y2m;
++          }
++
++          var intr = interHelper(bez1, bez2);
++          for (var k = 0, kk = intr.length; k < kk; k++) {
++            intr[k].segment1 = i;
++            intr[k].segment2 = j;
++            intr[k].bez1 = bez1;
++            intr[k].bez2 = bez2;
++          }
++          res = res.concat(intr);
++        }
++      }
++    }
++  }
++  return res;
++}
++
++export function normalizePath(path) {
++  if (typeof path === "string") {
++    if (notcurvepath.test(path)) {
++      return _path2curve(parsePathString(path));
++    }
++
++    return parsePathString(path);
++  }
++
++  return path;
++}
++
++export function parsePathString(pathString) {
++  const paramCounts = {
++    a: 7,
++    c: 6,
++    h: 1,
++    l: 2,
++    m: 2,
++    r: 4,
++    q: 4,
++    s: 4,
++    t: 2,
++    v: 1,
++    z: 0,
++  };
++  const data = [];
++
++  if (!data.length) {
++    pathString.replace(pathCommand, function (a, b, c) {
++      var params = [],
++        name = b.toLowerCase();
++      c.replace(pathValues, function (a, b) {
++        b && params.push(+b);
++      });
++      while (params.length >= paramCounts[name]) {
++        data.push([b].concat(params.splice(0, paramCounts[name])));
++        if (!paramCounts[name]) {
++          break;
++        }
++      }
++    });
++  }
++
++  return data;
++}
++
++export function isPointInsidePath(path, x, y, fix) {
++  var bbox = pathDimensions(path);
++
++  return (
++    isPointInsideBBox(bbox, x, y) &&
++    // eslint-disable-next-line
++    pathIntersection(path, _path2curve(fix ? [["M", x, y], ["H", bbox.x2 + 10]] : [["M", x, y], ["L", bbox.x2 + 10, bbox.y2 + 10]])).length % 2 === 1
++  );
++}
++
++export function findDotsAtSegment(p1x, p1y, c1x, c1y, c2x, c2y, p2x, p2y, t) {
++  var t1 = 1 - t,
++    t13 = Math.pow(t1, 3),
++    t12 = Math.pow(t1, 2),
++    t2 = t * t,
++    t3 = t2 * t,
++    x = t13 * p1x + t12 * 3 * t * c1x + t1 * 3 * t * t * c2x + t3 * p2x,
++    y = t13 * p1y + t12 * 3 * t * c1y + t1 * 3 * t * t * c2y + t3 * p2y,
++    mx = p1x + 2 * t * (c1x - p1x) + t2 * (c2x - 2 * c1x + p1x),
++    my = p1y + 2 * t * (c1y - p1y) + t2 * (c2y - 2 * c1y + p1y),
++    nx = c1x + 2 * t * (c2x - c1x) + t2 * (p2x - 2 * c2x + c1x),
++    ny = c1y + 2 * t * (c2y - c1y) + t2 * (p2y - 2 * c2y + c1y),
++    ax = t1 * p1x + t * c1x,
++    ay = t1 * p1y + t * c1y,
++    cx = t1 * c2x + t * p2x,
++    cy = t1 * c2y + t * p2y,
++    alpha = 90 - (Math.atan2(mx - nx, my - ny) * 180) / Math.PI;
++  (mx > nx || my < ny) && (alpha += 180);
++  return {
++    x: x,
++    y: y,
++    m: { x: mx, y: my },
++    n: { x: nx, y: ny },
++    start: { x: ax, y: ay },
++    end: { x: cx, y: cy },
++    alpha: alpha,
++  };
++}
++
++export function pathDimensions(path) {
++  path = normalizePath(path);
++
++  var x = 0,
++    y = 0,
++    X = [],
++    Y = [],
++    p;
++  for (var i = 0, ii = path.length; i < ii; i++) {
++    p = path[i];
++    if (p[0] === "M") {
++      x = p[1];
++      y = p[2];
++      X.push(x);
++      Y.push(y);
++    } else {
++      var dim = curveDim(x, y, p[1], p[2], p[3], p[4], p[5], p[6]);
++      X = X.concat(dim.min.x, dim.max.x);
++      Y = Y.concat(dim.min.y, dim.max.y);
++      x = p[5];
++      y = p[6];
++    }
++  }
++  var xmin = Math.min.apply(0, X),
++    ymin = Math.min.apply(0, Y),
++    xmax = Math.max.apply(0, X),
++    ymax = Math.max.apply(0, Y),
++    width = xmax - xmin,
++    height = ymax - ymin,
++    bb = {
++      x: xmin,
++      y: ymin,
++      x2: xmax,
++      y2: ymax,
++      width: width,
++      height: height,
++      cx: xmin + width / 2,
++      cy: ymin + height / 2,
++    };
++  return bb;
++}
++
++export function getTotalLength(path, length) {
++  var x,
++    y,
++    p,
++    l,
++    len = 0;
++
++  for (var i = 0, ii = path.length; i < ii; i++) {
++    p = path[i];
++    if (p[0] === "M") {
++      x = +p[1];
++      y = +p[2];
++    } else {
++      l = getPointAtSegmentLength(x, y, p[1], p[2], p[3], p[4], p[5], p[6]);
++      len += l;
++      x = +p[5];
++      y = +p[6];
++    }
++  }
++
++  return len;
++}
++export function getPointAtLength(path, length) {
++  var x,
++    y,
++    p,
++    l,
++    point,
++    len = 0;
++  for (var i = 0, ii = path.length; i < ii; i++) {
++    p = path[i];
++    if (p[0] === "M") {
++      x = +p[1];
++      y = +p[2];
++    } else {
++      l = getPointAtSegmentLength(x, y, p[1], p[2], p[3], p[4], p[5], p[6]);
++      if (len + l > length) {
++        point = getPointAtSegmentLength(
++          x,
++          y,
++          p[1],
++          p[2],
++          p[3],
++          p[4],
++          p[5],
++          p[6],
++          length - len,
++        );
++        return { x: point.x, y: point.y, alpha: point.alpha };
++      }
++      len += l;
++      x = +p[5];
++      y = +p[6];
++    }
++  }
++  point = findDotsAtSegment(x, y, p[0], p[1], p[2], p[3], p[4], p[5], 1);
++  point.alpha && (point = { x: point.x, y: point.y, alpha: point.alpha });
++
++  return point;
++}
+diff --git a/src/element/path/raphaelBools.js b/src/element/path/raphaelBools.js
+new file mode 100644
+index 000000000000..8d94555bb20c
+--- /dev/null
++++ b/src/element/path/raphaelBools.js
+@@ -0,0 +1,808 @@
++import * as R from "./raphael";
++
++let retried = false;
++
++/**
++ * convert raphael's internal path representation (must be converted to curves before) to segments / bezier curves
++ *
++ * @returns array segments (path as a collection of segments)
++ */
++function generatePathSegments(path) {
++  const segments = [];
++
++  path.forEach((pathCommand, i) => {
++    let seg = {
++      items: [],
++    };
++
++    //if command is a moveto create new sub-path
++    if (pathCommand[0] !== "M") {
++      const prevCommand = path[i - 1];
++      const prevCommandLength = prevCommand.length;
++
++      seg = {
++        items: [
++          prevCommand[prevCommandLength - 2],
++          prevCommand[prevCommandLength - 1],
++          ...pathCommand.slice(1),
++        ],
++      };
++    }
++
++    //add empty segments for "moveto", because Raphael counts it when calculating interceptions
++    if (i > 0) {
++      segments.push(seg);
++    }
++  });
++
++  return segments;
++}
++
++/**
++ * mark the starting and ending points of all subpaths
++ * to simplify later building of closed paths
++ *
++ * @params (a list of paths in segment representation)
++ *
++ * @returns void
++ */
++function markSubpathEndings(...pathSegments) {
++  let subPaths = 0; //store overall number of existing subpaths (for id generation)
++
++  pathSegments.forEach((segments) => {
++    //iterate path segments
++    for (let i = 0; i < segments.length; i++) {
++      const seg = segments[i];
++      const nextSeg = segments[i + 1];
++
++      //first segment of a path has always starting point of subpath
++      if (i === 0) {
++        seg.startPoint = `S${subPaths}`;
++      }
++
++      //if ending point of a segment is different from starting  point of next seg. mark both
++      if (i < segments.length - 1) {
++        if (
++          seg.items[6] !== nextSeg.items[0] ||
++          seg.items[7] !== nextSeg.items[1]
++        ) {
++          seg.endPoint = `S${subPaths}`;
++          subPaths++;
++          nextSeg.startPoint = `S${subPaths}`;
++        }
++      }
++
++      //if all coords of a segment are the same mark starting and ending point (RaphaelJS bug)
++
++      //last segment of a path has always ending point of subpath
++      if (i === segments.length - 1) {
++        seg.endPoint = `S${subPaths}`;
++        subPaths++;
++      }
++    }
++  });
++}
++
++/**
++ * execute the bool operation
++ *
++ * @param string type (name of the boolean operation)
++ * @param array path1Segs (segment representation of path1)
++ * @param array path2Segs (segment representation of path2)
++ *
++ * @return array newPath (segment representation of the resulting path)
++ */
++function operateBool(type, path1, path2, fix) {
++  const path1Segs = generatePathSegments(path1);
++  const path2Segs = generatePathSegments(path2);
++
++  markSubpathEndings(path1Segs, path2Segs);
++
++  //get intersections of both paths
++  var intersections = getIntersections(path1, path2);
++
++  //if any insert intersections into paths
++  if (intersections.length > 0) {
++    insertIntersectionPoints(path1Segs, 1, intersections);
++    insertIntersectionPoints(path2Segs, 2, intersections);
++  }
++
++  var newParts = buildNewPathParts(type, path1Segs, path2Segs, fix);
++  var indexes = buildPartIndexes(newParts);
++
++  let result;
++
++  try {
++    result = buildNewPath(
++      type,
++      newParts,
++      indexes.inversions,
++      indexes.startIndex,
++      fix,
++    );
++  } catch (error) {
++    if (retried) {
++      retried = false;
++
++      return;
++    }
++
++    retried = true;
++
++    return operateBool(type, path1, path2, true);
++  }
++
++  return {
++    data: pathSegsToArr(result),
++    intersections,
++  };
++}
++
++/**
++ * convert a path array into path string
++ *
++ * @param arr pathArr
++ *
++ * @returns string
++ */
++export function pathArrToStr(pathArr) {
++  return pathArr.join(",").replace(/,?([achlmqrstvxz]),?/gi, "$1");
++}
++
++/**
++ * Shortcut helper
++ *
++ * @returns string (path string)
++ */
++var pathSegsToStr = function (pathSegs) {
++  return pathArrToStr(pathSegsToArr(pathSegs));
++};
++
++/**
++ * convert segments / bezier curves representation of a path to raphael's internal path representation (svg commands as array)
++ *
++ * @param array pathSegs (path as a collection of segments)
++ *
++ * @returns array pathArr (RaphaelJS path array)
++ */
++var pathSegsToArr = function (segments) {
++  var pathArr = [];
++
++  segments.forEach((segment, i) => {
++    //ignore empty segments
++    if (segment.items.length === 0) {
++      return;
++    }
++
++    const prevSegment = segments[i - 1];
++    let command = [];
++    //if start point of current segment is different from end point of previous segment add a new subpath
++    if (
++      i === 0 ||
++      segment.items[0] !== prevSegment.items[prevSegment.items.length - 2] ||
++      segment.items[1] !== prevSegment.items[prevSegment.items.length - 1]
++    ) {
++      command.push("M", segment.items[0], segment.items[1]);
++      pathArr.push(command);
++      command = [];
++    }
++    command.push("C");
++
++    for (var j = 2; j < segment.items.length; j++) {
++      command.push(segment.items[j]);
++    }
++    pathArr.push(command);
++  });
++
++  return pathArr;
++};
++
++/**
++ * splits a segment of given path into two by using de Casteljau's algorithm (http://en.wikipedia.org/wiki/De_Casteljau%27s_algorithm - Geometric interpretation)
++ *
++ * @param array pathSegs (segment representation of a path returned by function pathArrToSegs)
++ * @param int segNr (nr of the segment - starting with 1, like it is returned by Raphael.pathIntersection: segment1, segment2)
++ *
++ * @returns void
++ */
++function splitSegment(segments, segNr, t, newPoint, intersId) {
++  const oldSeg = segments[segNr - 1];
++  const { items } = oldSeg;
++
++  //new anchor for start point of segment / bezier curve
++  const newA1_1 = [
++    items[0] + t * (items[2] - items[0]),
++    items[1] + t * (items[3] - items[1]),
++  ];
++  //new anchor for end point of segment / bezier curve
++  const newA2_2 = [
++    items[4] + t * (items[6] - items[4]),
++    items[5] + t * (items[7] - items[5]),
++  ];
++
++  //intermediate point between the two original anchors
++  const iP = [
++    items[2] + t * (items[4] - items[2]),
++    items[3] + t * (items[5] - items[3]),
++  ];
++
++  //calculate anchors for the inserted point
++  const newA1_2 = [
++    newA1_1[0] + t * (iP[0] - newA1_1[0]),
++    newA1_1[1] + t * (iP[1] - newA1_1[1]),
++  ];
++  const newA2_1 = [
++    iP[0] + t * (newA2_2[0] - iP[0]),
++    iP[1] + t * (newA2_2[1] - iP[1]),
++  ];
++
++  //set coordinates for new segments
++  const newSeg1 = {
++    items: [items[0], items[1], ...newA1_1, ...newA1_2, ...newPoint],
++  };
++
++  if (typeof oldSeg.startPoint !== "undefined") {
++    newSeg1.startPoint = oldSeg.startPoint;
++  }
++  newSeg1.endPoint = `I${intersId}`; //mark end point as intersection
++
++  const newSeg2 = {
++    items: [...newPoint, ...newA2_1, ...newA2_2, items[6], items[7]],
++  };
++  newSeg2.startPoint = `I${intersId}`; //mark start point as intersection
++  if (typeof oldSeg.endPoint !== "undefined") {
++    newSeg2.endPoint = oldSeg.endPoint;
++  }
++
++  //insert new segments and replace the old one
++  segments.splice(segNr - 1, 1, newSeg1, newSeg2);
++}
++
++/**
++ * add points path given by intersections array
++ *
++ * @param array pathSegs (path in segement representation)
++ * @param array inters (intersections returned by Raphael.pathIntersection)
++ *
++ * @returns void
++ */
++function insertIntersectionPoints(pathSegs, pathNr, inters) {
++  inters.forEach((interI, i) => {
++    let splits = 0;
++    let t = interI[`t${pathNr}`];
++    let t1 = 0;
++    let t2 = 1;
++
++    for (let j = 0; j <= i; j++) {
++      const interJ = inters[j];
++
++      //check if previous segments where splitted before (influences segment nr)
++      if (interJ[`segment${pathNr}`] < interI[`segment${pathNr}`]) {
++        splits++;
++      }
++
++      //check if currently affected segment was splitted before
++      //this influences segment nr and t -> get nearest t1 (lower) and t2 (higher) for recalculation of t
++      if (interJ[`segment${pathNr}`] === interI[`segment${pathNr}`]) {
++        if (interJ[`t${pathNr}`] < t) {
++          splits++;
++          if (interJ[`t${pathNr}`] > t1) {
++            t1 = interJ[`t${pathNr}`];
++          }
++        }
++
++        if (interJ[`t${pathNr}`] > t && interJ[`t${pathNr}`] < t2) {
++          t2 = interJ[`t${pathNr}`];
++        }
++      }
++    }
++
++    //recalculate t
++    t = (t - t1) / (t2 - t1);
++
++    //split intersected segments
++    splitSegment(
++      pathSegs,
++      interI[`segment${pathNr}`] + splits,
++      t,
++      [interI.x, interI.y],
++      i,
++    );
++  });
++}
++
++/**
++ * checks wether a segment is inside a path by selecting the point at t = 0.5 (only works properly after inserting intersections)
++ *
++ * @param array seg (segment of a path)
++ * @param string path (string representation of the [other] path)
++ *
++ * @returns bool
++ */
++var isSegInsidePath = function (segments, path, fix) {
++  //get point on segment (t = 0.5)
++  var point = R.findDotsAtSegment(...[...segments, 0.5]);
++
++  //is point inside of given path
++  return R.isPointInsidePath(path, point.x, point.y, fix);
++};
++
++/**
++ * invert the coordinates of given segment array
++ *
++ * @param array segCoords (representing the coords of a segment, length = 7)
++ *
++ * @returns void
++ */
++var invertSeg = function (segCoords) {
++  var tmp = JSON.parse(JSON.stringify(segCoords));
++  segCoords[0] = tmp[6];
++  segCoords[1] = tmp[7];
++  segCoords[2] = tmp[4];
++  segCoords[3] = tmp[5];
++  segCoords[4] = tmp[2];
++  segCoords[5] = tmp[3];
++  segCoords[6] = tmp[0];
++  segCoords[7] = tmp[1];
++
++  //return [segCoords[6], segCoords[7], segCoords[4], segCoords[5], segCoords[2], segCoords[3], segCoords[0], segCoords[1]];
++  //return segCoords;
++};
++
++/**
++ * invert the given part (of a path), including coordinates in segments, starting and ending points
++ *
++ * @param array part
++ *
++ * returns void
++ */
++var invertPart = function (segments) {
++  const length = segments.length;
++
++  segments.map((segment) => invertSeg(segment.items));
++
++  //invert order of segments
++  segments.reverse();
++
++  const firstSegment = segments[0];
++  const lastSegment = segments[length - 1];
++
++  //switch starting and ending points
++  const oldStartPoint = lastSegment.startPoint;
++  firstSegment.startPoint = firstSegment.endPoint;
++
++  if (length > 1) {
++    delete firstSegment.endPoint;
++  }
++
++  lastSegment.endPoint = oldStartPoint;
++  if (length > 1) {
++    delete lastSegment.startPoint;
++  }
++};
++
++/**
++ * calculate the direction of the given path
++ *
++ * @param array pathSegArr (path array in segment representation)
++ *
++ * @returns int dir (1: clockwise, -1: counter clockwise)
++ */
++function getPathDirection(pathSegArr) {
++  var dir = -1;
++  var minT, maxT;
++
++  //get y of path's starting point
++  var startY = pathSegArr[0].items[1];
++
++  //convert path to string
++  var path = pathSegsToStr(pathSegArr);
++  var box = R.pathDimensions(path);
++
++  //"draw" a horizontal line from left to right at half height of path's bbox
++  var lineY = box.y + box.height / 2;
++  var line = `M${box.x},${lineY}L${box.x2},${lineY}`;
++
++  //get intersections of line and path
++  var inters = R.pathIntersection(line, path);
++
++  //get intersections with extrema for t on line
++  for (var i = 0; i < inters.length; i++) {
++    if (minT === undefined || inters[i].t1 <= inters[minT].t1) {
++      minT = i;
++    }
++    if (maxT === undefined || inters[i].t1 >= inters[maxT].t1) {
++      maxT = i;
++    }
++  }
++
++  //decide, if path is clockwise (1) or counter clockwise (-1)
++  if (
++    (startY <= lineY && inters[minT].segment2 >= inters[maxT].segment2) ||
++    (startY >= lineY && inters[minT].segment2 <= inters[maxT].segment2)
++  ) {
++    //for path with only one segment compare t
++    if (inters[minT].segment2 === inters[maxT].segment2) {
++      if (
++        (startY <= lineY && inters[minT].t2 >= inters[maxT].t2) ||
++        (startY >= lineY && inters[minT].t2 <= inters[maxT].t2)
++      ) {
++        dir = 1;
++      }
++    } else {
++      dir = 1;
++    }
++  }
++
++  return dir;
++}
++
++/**
++ * wrapper for RaphaelJS pathIntersection()
++ * with filter for redundant intersections caused by
++ * - self-intersection (path1 = path2)
++ * - intersections that lies exactly in path points (path1 != path2; use strict mode!)
++ *
++ * @param string path1
++ * @param string path2
++ * @param bool strict (true: also assume intersections as obolete that are close segment's starting / ending points; use only when path1 != path2!)
++ *
++ * @returns array validInters (filtered path intersections calculated by Raphael.pathIntersections())
++ */
++function getIntersections(path1, path2) {
++  const d = 0.05; //min. deviation to assume point as different from another
++  const inters = R.pathIntersection(path1, path2);
++  const validInters = [];
++  let valid = true;
++
++  //iterate all other intersections
++  for (let i = 0; i < inters.length; i++) {
++    const p = inters[i];
++    valid = true;
++
++    //iterate all valid intersections and check if point already exists, if not push to valid intersections
++    if (validInters.length > 0) {
++      for (let j = 1; j < validInters.length; j++) {
++        if (
++          Math.abs(validInters[j].x - p.x) < d &&
++          Math.abs(validInters[j].y - p.y) < d
++        ) {
++          valid = false;
++          break;
++        }
++      }
++    }
++
++    if (valid) {
++      if ((1 - p.t1 < d || p.t1 < d) && (1 - p.t2 < d || p.t2 < d)) {
++        valid = false;
++      }
++    }
++
++    if (valid) {
++      validInters.push(inters[i]);
++    }
++  }
++
++  return validInters;
++}
++
++/**
++ * collect the parts of the resulting path according to given rules for the type of boolean operation
++ * a part is characterized as a bunch of segments - first and last segment hosts a sub-path starting / ending point or intersection point
++ *
++ * @param string type (type of boolean operation)
++ * @param array path1Segs (path1 in segment representation)
++ * @param array path1Segs (path2 in segment representation)
++ *
++ * @returns array newParts (array of arrays holding segments)
++ */
++function buildNewPathParts(type, path1Segs, path2Segs, fix) {
++  let IOSituationChecked = false;
++  let insideOtherPath; //temporary flag
++  let partNeeded = false;
++  let newPathPart = { segments: [] };
++  const newParts = [];
++
++  /*
++  Add-Part-to-new-Path-Rules:
++    union:
++    path1 - segment NOT inside path2
++    path2 - segment NOT inside path1
++    difference:
++    path1 - segment NOT inside path2
++    path2 - segment inside path1
++    intersection:
++    path1 - segment inside path2
++    path2 - segment inside path1
++  */
++  const rules = {
++    union: {
++      0: false,
++      1: false,
++    },
++    difference: {
++      0: false,
++      1: true,
++    },
++    intersection: {
++      0: true,
++      1: true,
++    },
++  };
++
++  var paths = [
++    {
++      segs: path1Segs,
++      nr: 1,
++    },
++    {
++      segs: path2Segs,
++      nr: 2,
++    },
++  ];
++
++  //iterate both paths and collect parts that are needed according to rules
++  for (let p = 0; p <= 1; p++) {
++    const path = paths[p];
++
++    for (let s = 0; s < path.segs.length; s++) {
++      const segment = path.segs[s];
++      const segCoords = segment.items;
++
++      if (segCoords.length === 0) {
++        continue;
++      }
++      if (!IOSituationChecked) {
++        insideOtherPath = isSegInsidePath(
++          segCoords,
++          pathSegsToStr(paths[p ^ 1].segs),
++          fix,
++        );
++
++        IOSituationChecked = true;
++        partNeeded = rules[type][p] === insideOtherPath;
++      }
++
++      //if conditions are satisfied add current segment to new part
++      if (partNeeded) {
++        newPathPart.segments.push(segment);
++      }
++
++      if (typeof segment.endPoint !== "undefined") {
++        if (partNeeded) {
++          newPathPart.pathNr = path.nr;
++          newParts.push(newPathPart);
++        }
++        newPathPart = { segments: [] };
++        IOSituationChecked = false;
++      }
++    }
++  }
++
++  return newParts;
++}
++
++/**
++ * build indexes of the given path parts in order to simplify the process of putting parts together to a new path
++ *
++ * @param array parts
++ *
++ * @returns object (holding indexes and information about inverted parts)
++ */
++function buildPartIndexes(parts) {
++  var startIndex = {};
++  var endIndex = {};
++  var inversions = {
++    1: 0,
++    2: 0,
++  }; //count inversions on parts formerly belonging to path with the particular number
++
++  //iterate all parts of the new path and build indices of starting and ending points
++  parts.forEach((part, i) => {
++    let firstSegment = part.segments[0];
++    let lastSegment = part.segments[part.segments.length - 1];
++
++    //if starting point or ending point id already exists (and there are different) invert the part
++    if (firstSegment.startPoint !== lastSegment.endPoint) {
++      //part.pathNr == 2 &&
++      if (
++        typeof startIndex[firstSegment.startPoint] !== "undefined" ||
++        typeof endIndex[lastSegment.endPoint] !== "undefined"
++      ) {
++        //invert the segments
++        invertPart(part.segments);
++
++        firstSegment = part.segments[0];
++        lastSegment = part.segments[part.segments.length - 1];
++
++        //count inversions
++        inversions[part.pathNr]++;
++        part.inverted = true;
++      }
++    }
++
++    //save intersection id at starting point
++    startIndex[firstSegment.startPoint] = i;
++    endIndex[lastSegment.endPoint] = i;
++  });
++
++  return {
++    inversions: inversions,
++    startIndex: startIndex,
++    endIndex: endIndex,
++  };
++}
++
++/**
++ * the final step: build a new path out of the given parts by putting together the appropriate starting end ending points
++ *
++ * @param string type (type of the boolean operation)
++ * @param array parts (see buildNewPathParts())
++ * @param object inversions (see buildPartIndexes())
++ * @param array startIndex (see buildPartIndexes())
++ *
++ * @returns array resultPath (segment representation of the operation's resulting path)
++ */
++function buildNewPath(type, parts, inversions, startIndex, fix) {
++  var newPath = [];
++  var dirCheck = []; //starting position of subpaths marked for a direction check
++
++  //for union operation correct path directions where necessary
++  if (type === "union") {
++    //if inversions occured invert also other parts of the path (only where starting point = ending point)
++    parts.forEach((part) => {
++      if (
++        inversions[part.pathNr] > 0 &&
++        !part.inverted &&
++        part[0].startPoint === part[part.length - 1].endPoint
++      ) {
++        invertPart(part.segments);
++      }
++    });
++  }
++
++  //build new path as an array of (closed) sub-paths (segment representation)
++  if (parts.length > 0) {
++    let partsAdded = 0;
++    let curPart = parts[0];
++    let endPointId;
++    let subPath = [];
++    let firstStartPoint = curPart.segments[0].startPoint;
++
++    while (partsAdded < parts.length) {
++      const firstSegment = curPart.segments[0];
++      const lastSegment = curPart.segments[curPart.segments.length - 1];
++
++      //for difference operation prepare correction of path directions where necessary
++      if (type === "difference") {
++        //if part was belonging to path 2 and starting point = ending point (means part was a subpath of path2 and completely inside path1)
++        if (
++          curPart.pathNr === 2 &&
++          firstSegment.startPoint === lastSegment.endPoint
++        ) {
++          dirCheck.push(newPath.length);
++        }
++      }
++
++      subPath = subPath.concat(curPart.segments);
++      partsAdded++;
++      endPointId = lastSegment.endPoint;
++      curPart.added = true;
++
++      if (endPointId !== firstStartPoint) {
++        //path isn't closed yet
++        curPart = parts[startIndex[endPointId]]; //new part to add is the one that has current ending point as starting point
++      } else {
++        //add subpath to new path and find part that hasn't been added yet to start a new sub-path
++        newPath.push(subPath);
++        subPath = [];
++
++        for (let p = 1; p < parts.length; p++) {
++          if (!parts[p].added) {
++            curPart = parts[p];
++            firstStartPoint = curPart.segments[0].startPoint;
++            break;
++          }
++        }
++      }
++    }
++  }
++
++  //for difference operation correct path direction (by inverting sub-paths) where necessary
++  if (type === "difference") {
++    for (var i = 0; i < dirCheck.length; i++) {
++      //inside which subpath is the subpath that has to be checked
++      for (var o = 0; o < newPath.length; o++) {
++        const n = dirCheck[i];
++
++        if (n === o) {
++          continue;
++        }
++
++        if (
++          isSegInsidePath(newPath[n][0].items, pathSegsToStr(newPath[o]), fix)
++        ) {
++          var pathDirOut = getPathDirection(newPath[o]);
++          var pathDirIn = getPathDirection(newPath[n]);
++
++          //if both subpaths have the same direction invert the inner path
++          if (pathDirIn === pathDirOut) {
++            invertPart(newPath[n]);
++          }
++        }
++      }
++    }
++  }
++
++  //flatten new path
++  return newPath.reduce((acc, path) => {
++    return acc.concat(path);
++  }, []);
++}
++
++/**
++ * perform a union of the two given paths
++ *
++ * @param object path1: Path
++ * @param object path2: Path
++ *
++ * @returns {
++    data,
++    intersections,
++  }
++ */
++export function union(path1, path2) {
++  return operateBool("union", path1, path2);
++}
++
++/**
++ * perform a difference of the two given paths
++ *
++ * @param object path1: Path
++ * @param object path2: Path
++ *
++ * @returns {
++    data,
++    intersections,
++  }
++ */
++export function difference(path1, path2) {
++  return operateBool("difference", path1, path2);
++}
++
++/**
++ * perform an intersection of the two given paths
++ *
++ * @param object path1: Path
++ * @param object path2: Path
++ *
++ * @returns {
++    data,
++    intersections,
++  }
++ */
++export function intersection(path1, path2) {
++  return operateBool("intersection", path1, path2);
++}
++
++/**
++ * perform an exclusion of the two given paths -> A Exclusion B = (A Union B) Difference (A Intersection B)
++ *
++ * @param object path1: Path
++ * @param object path2: Path
++ *
++ * @returns {
++    data,
++    intersections,
++  }
++ */
++export function exclusion(path1, path2) {
++  const r1 = operateBool("union", path1, path2);
++  const r2 = operateBool("intersection", path1, path2);
++
++  return {
++    ...operateBool("difference", r1.data, r2.data),
++    intersections: r1.intersections,
++  };
++}
+diff --git a/src/element/resizeElements.ts b/src/element/resizeElements.ts
+index e39263e78880..21480b5baae1 100644
+--- a/src/element/resizeElements.ts
++++ b/src/element/resizeElements.ts
+@@ -13,7 +13,7 @@ import {
+   getCommonBounds,
+   getResizedElementAbsoluteCoords,
+ } from "./bounds";
+-import { isLinearElement } from "./typeChecks";
++import { isLinearElement, isPathElement } from "./typeChecks";
+ import { mutateElement } from "./mutateElement";
+ import { getPerfectElementSize } from "./sizeHelpers";
+ import {
+@@ -22,6 +22,7 @@ import {
+   normalizeResizeHandle,
+ } from "./resizeTest";
+ import { measureText, getFontString } from "../utils";
++import Path from "../element/path/Path";
+ 
+ type ResizeTestType = ReturnType<typeof resizeTest>;
+ 
+@@ -364,6 +365,7 @@ const resizeSingleElement = (
+   if (resizeHandle === "n" || resizeHandle === "nw" || resizeHandle === "ne") {
+     scaleY = (y2 - rotatedY) / (y2 - y1);
+   }
++
+   let nextWidth = element.width * scaleX;
+   let nextHeight = element.height * scaleY;
+   if (sidesWithSameLength) {
+@@ -412,6 +414,21 @@ const resizeSingleElement = (
+     deltaX2,
+     deltaY2,
+   );
++
++  let nextPathData = {};
++
++  if (isPathElement(element)) {
++    const path = new Path(element.d);
++
++    path.transform({
++      scale: [scaleX, scaleY],
++    });
++
++    nextPathData = {
++      d: path.toPathString(),
++    };
++  }
++
+   if (
+     nextWidth !== 0 &&
+     nextHeight !== 0 &&
+@@ -424,6 +441,7 @@ const resizeSingleElement = (
+       x: nextElementX,
+       y: nextElementY,
+       ...rescaledPoints,
++      ...nextPathData,
+     });
+   }
+ };
+diff --git a/src/element/typeChecks.ts b/src/element/typeChecks.ts
+index 10a40e8b3630..73055518f038 100644
+--- a/src/element/typeChecks.ts
++++ b/src/element/typeChecks.ts
+@@ -2,6 +2,7 @@ import {
+   ExcalidrawElement,
+   ExcalidrawTextElement,
+   ExcalidrawLinearElement,
++  ExcalidrawPathElement,
+ } from "./types";
+ 
+ export const isTextElement = (
+@@ -32,3 +33,9 @@ export const isExcalidrawElement = (element: any): boolean => {
+     element?.type === "line"
+   );
+ };
++
++export function isPathElement(
++  element?: ExcalidrawElement | null,
++): element is ExcalidrawPathElement {
++  return element != null && element.type === "path";
++}
+diff --git a/src/element/types.ts b/src/element/types.ts
+index ffba4b12e1c5..d2b416310648 100644
+--- a/src/element/types.ts
++++ b/src/element/types.ts
+@@ -44,6 +44,7 @@ export type ExcalidrawGenericElement =
+ export type ExcalidrawElement =
+   | ExcalidrawGenericElement
+   | ExcalidrawTextElement
++  | ExcalidrawPathElement
+   | ExcalidrawLinearElement;
+ 
+ export type NonDeleted<TElement extends ExcalidrawElement> = TElement & {
+@@ -70,6 +71,13 @@ export type ExcalidrawLinearElement = _ExcalidrawElementBase &
+     lastCommittedPoint?: Point | null;
+   }>;
+ 
++export type ExcalidrawPathElement = _ExcalidrawElementBase &
++  Readonly<{
++    type: "path";
++    d: string;
++    hollow: boolean;
++  }>;
++
+ export type PointerType = "mouse" | "pen" | "touch";
+ 
+ export type TextAlign = "left" | "center" | "right";
+@@ -77,8 +85,3 @@ export type VerticalAlign = "top" | "middle";
+ 
+ export type FontFamily = keyof typeof FONT_FAMILY;
+ export type FontString = string & { _brand: "fontString" };
+-
+-export interface ExcalidrawProps {
+-  width: number;
+-  height: number;
+-}
+diff --git a/src/locales/en.json b/src/locales/en.json
+index 7c0b47646f86..0b849d024821 100644
+--- a/src/locales/en.json
++++ b/src/locales/en.json
+@@ -58,6 +58,10 @@
+     "language": "Language",
+     "createRoom": "Share a live-collaboration session",
+     "duplicateSelection": "Duplicate",
++    "shapeDifference": "Difference",
++    "shapeUnion": "Union",
++    "shapeIntersection": "Intersection",
++    "shapeExclusion": "Exclusion",
+     "untitled": "Untitled",
+     "name": "Name",
+     "yourName": "Your name",
+@@ -90,6 +94,7 @@
+     "menu": "Menu",
+     "done": "Done",
+     "edit": "Edit",
++    "path": "Path",
+     "undo": "Undo",
+     "redo": "Redo",
+     "roomDialog": "Start live collaboration",
+diff --git a/src/math.ts b/src/math.ts
+index ae5ade72a4d6..e581728f9494 100644
+--- a/src/math.ts
++++ b/src/math.ts
+@@ -1,6 +1,65 @@
+ import { Point } from "./types";
+ import { LINE_CONFIRM_THRESHOLD } from "./constants";
+ import { ExcalidrawLinearElement } from "./element/types";
++import Path from "./element/path/Path";
++
++export function radianToDegree(radian: number) {
++  return (180 * radian) / Math.PI;
++}
++
++// https://bl.ocks.org/mbostock/8027637
++export function distanceFromPointToPath(path: string | Path, point: Point) {
++  let precision = 8;
++  let bestDistance = Infinity;
++  let bestLength = 0;
++  let p;
++
++  if (!path) {
++    return bestDistance;
++  }
++
++  if (typeof path === "string") {
++    path = new Path(path);
++  }
++  const pathLength = path.getTotalLength();
++
++  // linear scan for coarse approximation
++  for (let scanLength = 0; scanLength <= pathLength; scanLength += precision) {
++    p = path.getPointAtLength(scanLength);
++    const scanDistance = distance2d(p.x, p.y, point[0], point[1]);
++
++    if (scanDistance < bestDistance) {
++      bestLength = scanLength;
++      bestDistance = scanDistance;
++    }
++  }
++
++  // binary search for precise estimate
++  precision /= 2;
++  while (precision > 0.5) {
++    const beforeLength = bestLength - precision;
++    p = path.getPointAtLength(beforeLength);
++    const beforeDistance = distance2d(p.x, p.y, point[0], point[1]);
++
++    if (beforeLength >= 0 && beforeDistance < bestDistance) {
++      bestLength = beforeLength;
++      bestDistance = beforeDistance;
++    } else {
++      const afterLength = bestLength + precision;
++      p = path.getPointAtLength(afterLength);
++      const afterDistance = distance2d(p.x, p.y, point[0], point[1]);
++
++      if (afterLength <= pathLength && afterDistance < bestDistance) {
++        bestLength = afterLength;
++        bestDistance = afterDistance;
++      } else {
++        precision /= 2;
++      }
++    }
++  }
++
++  return bestDistance;
++}
+ 
+ // https://stackoverflow.com/a/6853926/232122
+ export const distanceBetweenPointAndSegment = (
+diff --git a/src/renderer/renderElement.ts b/src/renderer/renderElement.ts
+index 95fdaa68b528..fe32cbdf66ca 100644
+--- a/src/renderer/renderElement.ts
++++ b/src/renderer/renderElement.ts
+@@ -25,6 +25,7 @@ import { isPathALoop } from "../math";
+ import rough from "roughjs/bin/rough";
+ 
+ const CANVAS_PADDING = 20;
++const rM = /(?<=.{1})(?=M)/g; // excludes first matching
+ 
+ const DASHARRAY_DASHED = [12, 8];
+ const DASHARRAY_DOTTED = [3, 6];
+@@ -96,6 +97,10 @@ const drawElementOnCanvas = (
+       rc.draw(getShapeForElement(element) as Drawable);
+       break;
+     }
++    case "path": {
++      rc.draw(getShapeForElement(element) as Drawable);
++      break;
++    }
+     case "arrow":
+     case "draw":
+     case "line": {
+@@ -162,6 +167,42 @@ const shapeCache = new WeakMap<
+   Drawable | Drawable[] | null
+ >();
+ 
++function fixPath(d: string): string {
++  return `${d.replace(rM, "M0,0")}M0,0`;
++}
++
++function fixShape(shape: Drawable): Drawable {
++  const indies: { i: number; point: number[] }[] = [];
++  const ops = shape.sets[0].ops;
++
++  ops.splice(ops.length - 2, 2);
++
++  const length = ops.length - 2;
++
++  for (let i = 1; i < length; i++) {
++    if (ops[i].data[0] < 4) {
++      const { data: p1 } = ops[i + 1];
++      const { data: p2 } = ops[i + 2];
++
++      if (p1[0] < 4 && p2[0] > 4) {
++        indies.unshift({
++          i,
++          point: p2,
++        });
++      }
++    }
++  }
++
++  indies.forEach(({ i, point }) => {
++    ops.splice(i, 2, {
++      data: point,
++      op: "move",
++    });
++  });
++
++  return shape;
++}
++
+ export const getShapeForElement = (element: ExcalidrawElement) =>
+   shapeCache.get(element);
+ 
+@@ -230,7 +271,7 @@ export const generateRoughOptions = (element: ExcalidrawElement): Options => {
+   }
+ };
+ 
+-const generateElementShape = (
++export const generateElementShape = (
+   element: NonDeletedExcalidrawElement,
+   generator: RoughGenerator,
+ ) => {
+@@ -312,6 +353,32 @@ const generateElementShape = (
+         }
+         break;
+       }
++      case "path": {
++        const fixedPath = fixPath(element.d);
++
++        shape = generator.path(fixedPath, {
++          stroke: element.strokeColor,
++          fill:
++            element.backgroundColor === "transparent"
++              ? undefined
++              : element.backgroundColor,
++          fillStyle: element.fillStyle,
++          strokeWidth: element.strokeWidth,
++          roughness: element.roughness,
++          seed: element.seed,
++          combineNestedSvgPaths: element.hollow,
++        });
++
++        if (
++          element.roughness > 0 &&
++          element.fillStyle === "solid" &&
++          element.hollow
++        ) {
++          shape = fixShape(shape);
++        }
++
++        break;
++      }
+       case "text": {
+         // just to ensure we don't regenerate element.canvas on rerenders
+         shape = [];
+@@ -320,6 +387,8 @@ const generateElementShape = (
+     }
+     shapeCache.set(element, shape);
+   }
++
++  return shape;
+ };
+ 
+ const generateElementWithCanvas = (
+@@ -399,6 +468,7 @@ export const renderElement = (
+     case "line":
+     case "draw":
+     case "arrow":
++    case "path":
+     case "text": {
+       generateElementShape(element, generator);
+       if (renderOptimizations) {
+@@ -450,7 +520,8 @@ export const renderElementToSvg = (
+     }
+     case "rectangle":
+     case "diamond":
+-    case "ellipse": {
++    case "ellipse":
++    case "path": {
+       generateElementShape(element, generator);
+       const node = rsvg.draw(getShapeForElement(element) as Drawable);
+       const opacity = element.opacity / 100;
+diff --git a/src/scene/comparisons.ts b/src/scene/comparisons.ts
+index 3ab66e24face..3b29aa63efcc 100644
+--- a/src/scene/comparisons.ts
++++ b/src/scene/comparisons.ts
+@@ -11,7 +11,8 @@ export const hasBackground = (type: string) =>
+   type === "ellipse" ||
+   type === "diamond" ||
+   type === "draw" ||
+-  type === "line";
++  type === "line" ||
++  type === "path";
+ 
+ export const hasStroke = (type: string) =>
+   type === "rectangle" ||
+@@ -19,7 +20,8 @@ export const hasStroke = (type: string) =>
+   type === "diamond" ||
+   type === "arrow" ||
+   type === "draw" ||
+-  type === "line";
++  type === "line" ||
++  type === "path";
+ 
+ export const hasText = (type: string) => type === "text";
+ 
+diff --git a/src/time_constants.ts b/src/time_constants.ts
+index 96400d611633..27423b8f6e69 100644
+--- a/src/time_constants.ts
++++ b/src/time_constants.ts
+@@ -1,5 +1,5 @@
+ // time in milliseconds
+ export const TAP_TWICE_TIMEOUT = 300;
+-export const INITAL_SCENE_UPDATE_TIMEOUT = 5000;
++export const INITIAL_SCENE_UPDATE_TIMEOUT = 5000;
+ export const SYNC_FULL_SCENE_INTERVAL_MS = 20000;
+ export const TOUCH_CTX_MENU_TIMEOUT = 500;
+diff --git a/src/types.ts b/src/types.ts
+index f6c16a36a3bf..44b8030113fc 100644
+--- a/src/types.ts
++++ b/src/types.ts
+@@ -64,7 +64,7 @@ export type AppState = {
+   isResizing: boolean;
+   isRotating: boolean;
+   zoom: number;
+-  openMenu: "canvas" | "shape" | null;
++  openMenu: "canvas" | "shape" | "path" | null;
+   lastPointerDownWith: PointerType;
+   selectedElementIds: { [id: string]: boolean };
+   previousSelectedElementIds: { [id: string]: boolean };
+@@ -107,3 +107,8 @@ export type SocketUpdateData = SocketUpdateDataSource[keyof SocketUpdateDataSour
+ };
+ 
+ export type LibraryItems = readonly NonDeleted<ExcalidrawElement>[][];
++
++export interface ExcalidrawProps {
++  width: number;
++  height: number;
++}
