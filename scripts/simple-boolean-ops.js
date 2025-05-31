@@ -13,14 +13,19 @@ function elementToCoords(element) {
       ];
     
     case 'ellipse':
-      // Approximate ellipse with octagon
+      // High-resolution ellipse approximation
       const cx = element.x + element.width / 2;
       const cy = element.y + element.height / 2;
       const rx = element.width / 2;
       const ry = element.height / 2;
       const coords = [];
-      for (let i = 0; i < 8; i++) {
-        const angle = (i * Math.PI * 2) / 8;
+      
+      // Use adaptive resolution based on size
+      const perimeter = Math.PI * (3 * (rx + ry) - Math.sqrt((3 * rx + ry) * (rx + 3 * ry)));
+      const numPoints = Math.max(32, Math.min(128, Math.floor(perimeter / 5))); // 5 pixels per segment
+      
+      for (let i = 0; i < numPoints; i++) {
+        const angle = (i * Math.PI * 2) / numPoints;
         coords.push([
           cx + rx * Math.cos(angle),
           cy + ry * Math.sin(angle)
