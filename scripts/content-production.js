@@ -17,8 +17,32 @@ function waitForExcalidraw() {
 }
 
 function initializeBooleanOperations() {
+  // Load simple boolean operations (working version)
+  const boolOpsScript = document.createElement('script');
+  boolOpsScript.src = chrome.runtime.getURL('scripts/simple-boolean-ops.js');
+  boolOpsScript.onload = function() {
+    initializeBooleanOperationsCore();
+  };
+  boolOpsScript.onerror = function() {
+    console.error('[Boolean Ops] Failed to load boolean operations');
+    showToast('Failed to load required library', 'error');
+  };
+  document.head.appendChild(boolOpsScript);
+}
+
+function initializeBooleanOperationsCore() {
   // Inject state monitor
   injectStateMonitor();
+  
+  // Inject perform operation handler
+  const performScript = document.createElement('script');
+  performScript.src = chrome.runtime.getURL('scripts/perform-operation.js');
+  document.head.appendChild(performScript);
+  
+  // Inject update handler
+  const updateScript = document.createElement('script');
+  updateScript.src = chrome.runtime.getURL('scripts/update-excalidraw.js');
+  document.head.appendChild(updateScript);
   
   // Create validation feedback
   const validationFeedback = document.createElement('div');
@@ -152,6 +176,15 @@ function initializeBooleanOperations() {
       }
     } else if (event.data.type === 'DEBUG_STATE_RESULTS') {
       // Debug state results received
+    } else if (event.data.type === 'BOOLEAN_OP_RESULT') {
+      handleBooleanOpResult(event.data);
+    } else if (event.data.type === 'EXCALIDRAW_UPDATE_SUCCESS') {
+      showToast('Boolean operation completed', 'success');
+    } else if (event.data.type === 'EXCALIDRAW_UPDATE_FAILED') {
+      console.error('[Boolean Ops] Update failed:', event.data.error);
+      showToast('Failed to update canvas', 'error');
+    } else if (event.data.type === 'REQUEST_DEBUG_STATE') {
+      injectDebugState();
     }
   });
   
@@ -294,9 +327,28 @@ async function performBooleanOperation(operation) {
     validIds.includes(el.id) && !el.isDeleted
   );
   
-  // TODO: Implement actual boolean operations
-  // For now, just show a success message
-  showToast(`${operation} operation will be performed on ${validElements.length} shapes`, 'success');
+  // Show loading state
+  const button = document.querySelector(`.boolean-op-btn[data-op="${operation}"]`);
+  if (button) {
+    button.classList.add('loading');
+  }
+  
+  try {
+    // Send message to perform operation
+    window.postMessage({
+      type: 'PERFORM_BOOLEAN_OP',
+      elements: validElements,
+      operation: operation,
+      validIds: validIds
+    }, '*');
+  } catch (error) {
+    console.error('[Boolean Ops] Error:', error);
+    showToast('Failed to perform boolean operation', 'error');
+    // Remove loading state
+    document.querySelectorAll('.boolean-op-btn.loading').forEach(btn => {
+      btn.classList.remove('loading');
+    });
+  }
 }
 
 function showToast(message, type = 'info') {
@@ -315,17 +367,35 @@ function showToast(message, type = 'info') {
   }, 3000);
 }
 
+// Handle boolean operation results
+function handleBooleanOpResult(data) {
+  // Remove loading state from all buttons
+  document.querySelectorAll('.boolean-op-btn.loading').forEach(btn => {
+    btn.classList.remove('loading');
+  });
+  
+  if (!data.success) {
+    console.error('[Boolean Ops] Operation failed:', data.error);
+    showToast(data.error || 'Boolean operation failed', 'error');
+    return;
+  }
+  
+  const { element, operation, originalIds } = data;
+  
+  // Send message to update Excalidraw
+  window.postMessage({
+    type: 'UPDATE_EXCALIDRAW_ELEMENTS',
+    newElement: element,
+    originalIds: originalIds
+  }, '*');
+}
+
 // Start
 waitForExcalidraw();
 
-// For easier debugging, inject the function into the page context
-const debugScript = document.createElement('script');
-debugScript.textContent = `
-  window.debugBooleanOps = function() {
-    // Load and execute the debug script
-    const script = document.createElement('script');
-    script.src = '${chrome.runtime.getURL('scripts/debug-state.js')}';
-    document.head.appendChild(script);
-  };
-`;
-document.head.appendChild(debugScript);
+// For easier debugging, inject the debug helper
+setTimeout(() => {
+  const debugScript = document.createElement('script');
+  debugScript.src = chrome.runtime.getURL('scripts/debug-helper.js');
+  document.head.appendChild(debugScript);
+}, 1000);

@@ -133,6 +133,31 @@
   background: #2196F3;
 }
 
+/* Loading state */
+.boolean-op-btn.loading {
+  position: relative;
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+.boolean-op-btn.loading::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 16px;
+  height: 16px;
+  margin: -8px 0 0 -8px;
+  border: 2px solid transparent;
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 /* Smooth transitions */
 * {
   box-sizing: border-box;
