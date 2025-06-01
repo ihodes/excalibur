@@ -21,7 +21,15 @@ function initializeBooleanOperations() {
   const boolOpsScript = document.createElement('script');
   boolOpsScript.src = chrome.runtime.getURL('scripts/simple-boolean-ops.js');
   boolOpsScript.onload = function() {
-    initializeBooleanOperationsCore();
+    // Load exact implementation
+    const exactScript = document.createElement('script');
+    exactScript.src = chrome.runtime.getURL('scripts/boolean-ops-exact.js');
+    exactScript.onload = function() {
+      // Override with exact implementation
+      window.performExcalidrawBooleanOp = window.performExcalidrawBooleanOpExact;
+      initializeBooleanOperationsCore();
+    };
+    document.head.appendChild(exactScript);
   };
   boolOpsScript.onerror = function() {
     console.error('[Boolean Ops] Failed to load boolean operations');

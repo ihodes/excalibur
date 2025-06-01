@@ -833,6 +833,16 @@ function buildPath(type, parts, indexes, inversions, startIndex = 0) {
       current.used = true;
       currentPath.push(current.segment);
       
+      // Debug current segment
+      console.log('[Boolean Ops] Current segment:', {
+        partIndex: current.partIndex,
+        segIndex: current.segIndex,
+        start: [current.segment.items[0], current.segment.items[1]],
+        end: [current.segment.items[6], current.segment.items[7]],
+        hasConnectsTo: !!current.segment.connectsTo,
+        intersectionEnd: current.segment.intersectionEnd
+      });
+      
       let nextSeg = null;
       
       // Check if we have explicit connectivity information

@@ -26,7 +26,7 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["scripts/state-monitor.js", "scripts/debug-state.js", "scripts/simple-boolean-ops.js", "scripts/perform-operation.js", "scripts/update-excalidraw.js", "scripts/debug-helper.js"],
+      "resources": ["scripts/state-monitor.js", "scripts/debug-state.js", "scripts/simple-boolean-ops.js", "scripts/simple-boolean-ops-v2.js", "scripts/boolean-ops-exact.js", "scripts/perform-operation.js", "scripts/update-excalidraw.js", "scripts/debug-helper.js"],
       "matches": ["https://excalidraw.com/*", "https://app.excalidraw.com/*", "http://localhost/*"]
     }
   ]
