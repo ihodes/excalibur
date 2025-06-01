@@ -463,7 +463,7 @@ function pathIntersection(path1, path2) {
 }
 
 // Split a segment at parameter t
-function splitSegment(segment, t) {
+function splitSegment(segment, t, intersection) {
   if (segment.items.length === 0) return [segment];
   
   const [x0, y0, x1, y1, x2, y2, x3, y3] = segment.items;
@@ -486,12 +486,20 @@ function splitSegment(segment, t) {
   
   const seg1 = {
     items: [x0, y0, x01, y01, x02, y02, x03, y03],
-    intersection: true
+    intersection: true,
+    intersectionInfo: intersection,
+    subPathStart: segment.subPathStart,
+    subPathEnd: false,
+    subPathId: segment.subPathId
   };
   
   const seg2 = {
     items: [x03, y03, x12, y12, x21, y21, x3, y3],
-    intersection: true
+    intersection: true,
+    intersectionInfo: intersection,
+    subPathStart: false,
+    subPathEnd: segment.subPathEnd,
+    subPathId: segment.subPathId
   };
   
   return [seg1, seg2];
@@ -515,8 +523,28 @@ function insertIntersectionPoints(pathSegments, pathId, intersections) {
     const t = int[`t${pathId}`] || 0.5;
     
     if (segIndex < pathSegments.length) {
-      const splits = splitSegment(pathSegments[segIndex], t);
+      const splits = splitSegment(pathSegments[segIndex], t, int);
+      
+      // Mark the intersection point on both split segments
+      splits[0].intersectionEnd = true;
+      splits[1].intersectionStart = true;
       pathSegments.splice(segIndex, 1, ...splits);
+      
+      // Update indices for remaining intersections
+      for (let j = i - 1; j >= 0; j--) {
+        if (relevantInts[j][`segment${pathId}`] === segIndex) {
+          // Adjust t value for the same segment
+          const oldT = relevantInts[j][`t${pathId}`];
+          if (oldT > t) {
+            relevantInts[j][`t${pathId}`] = (oldT - t) / (1 - t);
+            relevantInts[j][`segment${pathId}`]++;
+          } else {
+            relevantInts[j][`t${pathId}`] = oldT / t;
+          }
+        } else if (relevantInts[j][`segment${pathId}`] > segIndex) {
+          relevantInts[j][`segment${pathId}`]++;
+        }
+      }
     }
   }
 }
@@ -528,6 +556,9 @@ function generatePathSegments(path) {
   path.forEach((pathCommand, i) => {
     let seg = {
       items: [],
+      subPathStart: false,
+      subPathEnd: false,
+      subPathId: null
     };
     
     if (pathCommand[0] !== "M") {
@@ -540,6 +571,9 @@ function generatePathSegments(path) {
           prevCommand[prevCommandLength - 1],
           ...pathCommand.slice(1),
         ],
+        subPathStart: false,
+        subPathEnd: false,
+        subPathId: null
       };
     }
     
@@ -549,6 +583,37 @@ function generatePathSegments(path) {
   });
   
   return segments;
+}
+
+// Mark subpath start and end points
+function markSubpathEndings(...pathSegments) {
+  let subPaths = 0;
+  
+  pathSegments.forEach((pathSegment) => {
+    let subPathIndex = 0;
+    pathSegment.forEach((segment, segmentIndex) => {
+      const prevSegment = pathSegment[segmentIndex - 1];
+      
+      if (segmentIndex > 0 && segment.items.length === 0) {
+        prevSegment.subPathEnd = true;
+        prevSegment.subPathId = subPaths + "_" + subPathIndex;
+        segment.subPathStart = true;
+        subPathIndex++;
+      }
+    });
+    
+    const lastSegment = pathSegment[pathSegment.length - 1];
+    if (lastSegment && lastSegment.items.length) {
+      lastSegment.subPathEnd = true;
+      lastSegment.subPathId = subPaths + "_" + subPathIndex;
+    }
+    
+    if (pathSegment[0]) {
+      pathSegment[0].subPathStart = true;
+    }
+    
+    subPaths++;
+  });
 }
 
 // Check if a point is inside a path
@@ -607,133 +672,242 @@ function buildNewPathParts(type, path1Segs, path2Segs, path1String, path2String)
   
   const rule = rules[type];
   const newParts = [[], []];
+  const inversions = [];
   
   // Process path1 segments
-  path1Segs.forEach((segment) => {
+  path1Segs.forEach((segment, idx) => {
     if (segment.items.length === 0) return;
     
     const isInside = isSegInsidePath(segment, path2String);
     const keep = rule[0] ? isInside : !isInside;
     
     if (keep) {
+      segment.pathId = 1;
+      segment.originalIndex = idx;
       newParts[0].push(segment);
     }
   });
   
   // Process path2 segments
-  path2Segs.forEach((segment) => {
+  path2Segs.forEach((segment, idx) => {
     if (segment.items.length === 0) return;
     
     const isInside = isSegInsidePath(segment, path1String);
     const keep = rule[1] ? isInside : !isInside;
     
     if (keep) {
+      segment.pathId = 2;
+      segment.originalIndex = idx;
       newParts[1].push(segment);
+      
+      // Track inversions for difference operation
+      if (rule[1] && type === 'difference') {
+        inversions.push(segment);
+      }
     }
   });
   
-  return newParts;
+  return { newParts, inversions };
 }
 
-// Build connected path from segments
-function buildConnectedPath(segments) {
-  if (segments.length === 0) return [];
+// Build part indexes for path connectivity
+function buildPartIndexes(parts, intersections) {
+  const indexes = [];
+  const EPSILON = 0.1;
   
-  const result = [];
-  const used = new Array(segments.length).fill(false);
-  let currentIndex = 0;
-  
-  // Start with the first segment
-  const firstSeg = segments[0];
-  if (firstSeg.items.length > 0) {
-    result.push(["M", firstSeg.items[0], firstSeg.items[1]]);
-    result.push(["C", ...firstSeg.items.slice(2)]);
-    used[0] = true;
-  }
-  
-  // Current end point
-  let currentX = firstSeg.items[6];
-  let currentY = firstSeg.items[7];
-  let segmentsAdded = 1;
-  
-  // Try to connect segments
-  while (segmentsAdded < segments.length) {
-    let found = false;
-    const threshold = 0.1;
+  // Create index for each part (path)
+  parts.forEach((pathParts, pathIndex) => {
+    const index = {
+      segments: [],
+      connections: {}
+    };
     
-    for (let i = 0; i < segments.length; i++) {
-      if (used[i] || segments[i].items.length === 0) continue;
+    pathParts.forEach((segment, segIndex) => {
+      if (segment.items.length === 0) return;
       
-      const seg = segments[i];
-      const startX = seg.items[0];
-      const startY = seg.items[1];
-      const endX = seg.items[6];
-      const endY = seg.items[7];
+      const segInfo = {
+        index: segIndex,
+        segment: segment,
+        start: [segment.items[0], segment.items[1]],
+        end: [segment.items[6], segment.items[7]],
+        connects: []
+      };
       
-      // Check if this segment connects to current point
-      const distToStart = Math.sqrt(Math.pow(startX - currentX, 2) + Math.pow(startY - currentY, 2));
-      const distToEnd = Math.sqrt(Math.pow(endX - currentX, 2) + Math.pow(endY - currentY, 2));
-      
-      if (distToStart < threshold) {
-        // Connect normally
-        result.push(["C", ...seg.items.slice(2)]);
-        currentX = endX;
-        currentY = endY;
-        used[i] = true;
-        segmentsAdded++;
-        found = true;
-        break;
-      } else if (distToEnd < threshold) {
-        // Connect in reverse
-        result.push(["C", seg.items[4], seg.items[5], seg.items[2], seg.items[3], seg.items[0], seg.items[1]]);
-        currentX = startX;
-        currentY = startY;
-        used[i] = true;
-        segmentsAdded++;
-        found = true;
-        break;
+      // Check if this segment ends at an intersection
+      if (segment.intersection && segment.intersectionInfo) {
+        const intInfo = segment.intersectionInfo;
+        segInfo.intersectionEnd = intInfo;
       }
-    }
-    
-    if (!found) {
-      // Find nearest unused segment
-      let minDist = Infinity;
-      let nearestIdx = -1;
       
-      for (let i = 0; i < segments.length; i++) {
-        if (used[i] || segments[i].items.length === 0) continue;
+      index.segments.push(segInfo);
+    });
+    
+    // Build connectivity between segments
+    index.segments.forEach((seg1, idx1) => {
+      index.segments.forEach((seg2, idx2) => {
+        if (idx1 === idx2) return;
         
-        const seg = segments[i];
-        const dist = Math.sqrt(Math.pow(seg.items[0] - currentX, 2) + Math.pow(seg.items[1] - currentY, 2));
-        if (dist < minDist) {
-          minDist = dist;
-          nearestIdx = i;
+        const dist = Math.sqrt(
+          Math.pow(seg1.end[0] - seg2.start[0], 2) + 
+          Math.pow(seg1.end[1] - seg2.start[1], 2)
+        );
+        
+        if (dist < EPSILON) {
+          seg1.connects.push(idx2);
         }
+      });
+    });
+    
+    indexes.push(index);
+  });
+  
+  return indexes;
+}
+
+// Build the actual path by traversing segments
+function buildPath(type, parts, indexes, inversions, startIndex = 0) {
+  const paths = [];
+  const allSegments = [];
+  
+  // Collect all segments from both parts
+  parts.forEach((pathParts, partIndex) => {
+    pathParts.forEach((segment, segIndex) => {
+      if (segment.items.length > 0) {
+        allSegments.push({
+          segment: segment,
+          partIndex: partIndex,
+          segIndex: segIndex,
+          used: false
+        });
       }
-      
-      if (nearestIdx >= 0) {
-        const seg = segments[nearestIdx];
-        // Add a line to connect if needed
-        if (minDist > threshold) {
-          result.push(["L", seg.items[0], seg.items[1]]);
-        }
-        result.push(["C", ...seg.items.slice(2)]);
-        currentX = seg.items[6];
-        currentY = seg.items[7];
-        used[nearestIdx] = true;
-        segmentsAdded++;
-      } else {
+    });
+  });
+  
+  // Build paths by following connections
+  while (true) {
+    // Find an unused segment to start
+    let startSeg = null;
+    for (let i = 0; i < allSegments.length; i++) {
+      if (!allSegments[i].used) {
+        startSeg = allSegments[i];
         break;
       }
     }
+    
+    if (!startSeg) break; // All segments used
+    
+    const currentPath = [];
+    let current = startSeg;
+    const visited = new Set();
+    
+    // Trace path from this starting segment
+    while (current && !current.used) {
+      current.used = true;
+      currentPath.push(current.segment);
+      
+      // Find next segment
+      const currentEnd = [current.segment.items[6], current.segment.items[7]];
+      let nextSeg = null;
+      let minDist = 0.1; // threshold
+      
+      // First, look for connecting segment from same path
+      for (let i = 0; i < allSegments.length; i++) {
+        if (allSegments[i].used) continue;
+        
+        const seg = allSegments[i];
+        const segStart = [seg.segment.items[0], seg.segment.items[1]];
+        const dist = Math.sqrt(
+          Math.pow(currentEnd[0] - segStart[0], 2) + 
+          Math.pow(currentEnd[1] - segStart[1], 2)
+        );
+        
+        if (dist < minDist) {
+          // At intersection, apply boolean operation rules
+          if (current.segment.intersectionEnd && seg.segment.intersectionStart) {
+            // We're at an intersection - decide which path to follow
+            if (type === 'union') {
+              // For union, prefer segments from different paths
+              if (seg.partIndex !== current.partIndex) {
+                nextSeg = seg;
+                break;
+              }
+            } else if (type === 'intersection') {
+              // For intersection, prefer segments from same path
+              if (seg.partIndex === current.partIndex) {
+                nextSeg = seg;
+                break;
+              }
+            } else if (type === 'difference') {
+              // For difference, follow specific rules
+              if (current.partIndex === 0 && seg.partIndex !== current.partIndex) {
+                // From path1, switch to path2
+                nextSeg = seg;
+                break;
+              } else if (current.partIndex === 1 && seg.partIndex === current.partIndex) {
+                // From path2, stay on path2
+                nextSeg = seg;
+                break;
+              }
+            }
+          } else if (seg.partIndex === current.partIndex) {
+            // Not at intersection, prefer same path
+            nextSeg = seg;
+          } else if (!nextSeg) {
+            // If no same-path segment found, consider other path
+            nextSeg = seg;
+          }
+        }
+      }
+      
+      current = nextSeg;
+    }
+    
+    if (currentPath.length > 0) {
+      paths.push(currentPath);
+    }
   }
+  
+  return paths;
+}
+
+// Convert path segments to array format
+function pathSegsToArr(paths) {
+  const result = [];
+  
+  paths.forEach((path, pathIndex) => {
+    if (path.length === 0) return;
+    
+    let firstInPath = true;
+    let pathStartX = null, pathStartY = null;
+    let lastX = null, lastY = null;
+    
+    path.forEach((segment) => {
+      if (segment.items.length > 0) {
+        if (firstInPath) {
+          pathStartX = segment.items[0];
+          pathStartY = segment.items[1];
+          result.push(["M", pathStartX, pathStartY]);
+          firstInPath = false;
+        }
+        result.push(["C", ...segment.items.slice(2)]);
+        lastX = segment.items[6];
+        lastY = segment.items[7];
+      }
+    });
+    
+    // Close path if endpoints are close
+    if (pathStartX !== null && lastX !== null) {
+      const dist = Math.sqrt(
+        Math.pow(lastX - pathStartX, 2) + 
+        Math.pow(lastY - pathStartY, 2)
+      );
+      if (dist < 1) {
+        result.push(["Z"]);
+      }
+    }
+  });
   
   return result;
-}
-
-// Convert segments to path array
-function pathSegsToArr(segments) {
-  return buildConnectedPath(segments);
 }
 
 // Convert path array to string
@@ -773,14 +947,25 @@ function operateBool(type, path1, path2) {
     console.log('[Boolean Ops] Path2 segments after split:', path2Segs.length);
   }
   
-  const newParts = buildNewPathParts(type, path1Segs, path2Segs, path1, path2);
+  // Mark subpath endings
+  markSubpathEndings(path1Segs, path2Segs);
+  
+  const { newParts, inversions } = buildNewPathParts(type, path1Segs, path2Segs, path1, path2);
   console.log('[Boolean Ops] New parts:', newParts[0].length, 'from path1,', newParts[1].length, 'from path2');
   
-  // Combine all parts
-  const allSegments = [...newParts[0], ...newParts[1]];
+  // Build part indexes for connectivity
+  const indexes = buildPartIndexes(newParts, intersections);
+  
+  // Build the final path
+  const paths = buildPath(type, newParts, indexes, inversions);
+  console.log('[Boolean Ops] Built', paths.length, 'paths');
+  paths.forEach((path, idx) => {
+    console.log(`[Boolean Ops] Path ${idx}: ${path.length} segments`);
+  });
   
   return {
-    data: pathSegsToArr(allSegments),
+    data: pathSegsToArr(paths),
+    intersections: intersections.length
   };
 }
 
