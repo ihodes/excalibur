@@ -109,27 +109,167 @@ function simpleUnion(coords1, coords2) {
   return hull;
 }
 
-// Simple intersection: find overlapping area (simplified)
+// Simple intersection: find overlapping area
 function simpleIntersection(coords1, coords2) {
-  // For now, just return a simple overlap rectangle
+  console.log('[Simple Boolean] Computing intersection');
+  
+  // Find points from shape1 that are inside shape2
+  const pointsInside1 = coords1.filter(point => isPointInPolygon(point, coords2));
+  // Find points from shape2 that are inside shape1
+  const pointsInside2 = coords2.filter(point => isPointInPolygon(point, coords1));
+  
+  // Find intersection points between edges
+  const intersectionPoints = findPolygonIntersections(coords1, coords2);
+  
+  // Combine all points that define the intersection
+  const allIntersectionPoints = [...pointsInside1, ...pointsInside2, ...intersectionPoints];
+  
+  if (allIntersectionPoints.length < 3) {
+    // No valid intersection
+    return [];
+  }
+  
+  // Find convex hull of intersection points
+  const intersectionHull = convexHull(allIntersectionPoints);
+  
+  console.log('[Simple Boolean] Intersection result:', intersectionHull.length, 'points');
+  return intersectionHull;
+}
+
+// Simple difference: subtract second shape from first
+function simpleDifference(coords1, coords2) {
+  console.log('[Simple Boolean] Computing difference');
+  
+  // For a simple implementation, check if shapes overlap
   const bounds1 = getBounds(coords1);
   const bounds2 = getBounds(coords2);
   
-  const overlapX = Math.max(bounds1.x, bounds2.x);
-  const overlapY = Math.max(bounds1.y, bounds2.y);
-  const overlapRight = Math.min(bounds1.x + bounds1.width, bounds2.x + bounds2.width);
-  const overlapBottom = Math.min(bounds1.y + bounds1.height, bounds2.y + bounds2.height);
+  // Check if there's any overlap
+  if (bounds1.x + bounds1.width < bounds2.x || bounds2.x + bounds2.width < bounds1.x ||
+      bounds1.y + bounds1.height < bounds2.y || bounds2.y + bounds2.height < bounds1.y) {
+    // No overlap, return first shape unchanged
+    return coords1;
+  }
   
-  if (overlapRight > overlapX && overlapBottom > overlapY) {
+  // Find points from shape1 that are NOT inside shape2
+  const pointsOutside = coords1.filter(point => !isPointInPolygon(point, coords2));
+  
+  if (pointsOutside.length < 3) {
+    // First shape is entirely inside second shape
+    return [];
+  }
+  
+  // For now, return the convex hull of points outside
+  // A proper implementation would trace the boundary
+  return convexHull(pointsOutside);
+}
+
+// Simple exclusion: symmetric difference (union minus intersection)
+function simpleExclusion(coords1, coords2) {
+  console.log('[Simple Boolean] Computing exclusion');
+  
+  // Exclusion = parts in shape1 but not shape2, plus parts in shape2 but not shape1
+  
+  // Find points from shape1 that are NOT inside shape2
+  const points1NotIn2 = coords1.filter(point => !isPointInPolygon(point, coords2));
+  
+  // Find points from shape2 that are NOT inside shape1
+  const points2NotIn1 = coords2.filter(point => !isPointInPolygon(point, coords1));
+  
+  // If one shape is entirely inside the other, return the outer shape
+  if (points1NotIn2.length === 0) {
+    // Shape1 is entirely inside shape2, return shape2
+    return coords2;
+  }
+  if (points2NotIn1.length === 0) {
+    // Shape2 is entirely inside shape1, return shape1
+    return coords1;
+  }
+  
+  // Check if shapes don't overlap at all
+  const intersectionTest = simpleIntersection(coords1, coords2);
+  if (intersectionTest.length === 0) {
+    // No overlap, return union
+    return simpleUnion(coords1, coords2);
+  }
+  
+  // For overlapping shapes, we need to create two separate regions
+  // This is a simplified approach - just combine the non-overlapping points
+  const exclusionPoints = [...points1NotIn2, ...points2NotIn1];
+  
+  if (exclusionPoints.length < 3) {
+    // Not enough points for a valid shape
+    return [];
+  }
+  
+  // Create convex hull of the exclusion points
+  // Note: This is simplified - a proper implementation would create
+  // multiple polygons or a polygon with a hole
+  const hull = convexHull(exclusionPoints);
+  
+  console.log('[Simple Boolean] Exclusion result:', hull.length, 'points');
+  return hull;
+}
+
+// Check if a point is inside a polygon
+function isPointInPolygon(point, polygon) {
+  let inside = false;
+  const x = point[0], y = point[1];
+  
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const xi = polygon[i][0], yi = polygon[i][1];
+    const xj = polygon[j][0], yj = polygon[j][1];
+    
+    const intersect = ((yi > y) !== (yj > y)) && 
+                      (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+    if (intersect) inside = !inside;
+  }
+  
+  return inside;
+}
+
+// Find intersection points between two polygons
+function findPolygonIntersections(coords1, coords2) {
+  const intersections = [];
+  
+  // Check each edge of polygon1 against each edge of polygon2
+  for (let i = 0; i < coords1.length - 1; i++) {
+    for (let j = 0; j < coords2.length - 1; j++) {
+      const intersection = lineIntersection(
+        coords1[i], coords1[i + 1],
+        coords2[j], coords2[j + 1]
+      );
+      
+      if (intersection) {
+        intersections.push(intersection);
+      }
+    }
+  }
+  
+  return intersections;
+}
+
+// Find intersection point of two line segments
+function lineIntersection(p1, p2, p3, p4) {
+  const x1 = p1[0], y1 = p1[1];
+  const x2 = p2[0], y2 = p2[1];
+  const x3 = p3[0], y3 = p3[1];
+  const x4 = p4[0], y4 = p4[1];
+  
+  const denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+  if (Math.abs(denom) < 0.001) return null; // Parallel lines
+  
+  const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denom;
+  const u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / denom;
+  
+  if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
     return [
-      [overlapX, overlapY],
-      [overlapRight, overlapY],
-      [overlapRight, overlapBottom],
-      [overlapX, overlapBottom]
+      x1 + t * (x2 - x1),
+      y1 + t * (y2 - y1)
     ];
   }
   
-  return [];
+  return null;
 }
 
 // Get bounding box of coordinates
@@ -215,12 +355,10 @@ window.performExcalidrawBooleanOp = function(elements, operation) {
         resultCoords = simpleIntersection(coords1, coords2);
         break;
       case 'difference':
-        // For now, just return first shape
-        resultCoords = coords1;
+        resultCoords = simpleDifference(coords1, coords2);
         break;
       case 'exclusion':
-        // For now, return union (placeholder)
-        resultCoords = simpleUnion(coords1, coords2);
+        resultCoords = simpleExclusion(coords1, coords2);
         break;
       default:
         throw new Error(`Unsupported operation: ${operation}`);
