@@ -1,290 +1,324 @@
-// Simplified Boolean Operations
-// This provides basic working union operations for testing
+// Boolean Operations using diff.diff logic
+// This implements the exact algorithm from diff.diff
 
-// Convert Excalidraw element to simple coordinate array
-function elementToCoords(element) {
+// Convert Excalidraw element to SVG path string
+function elementToPath(element) {
   switch (element.type) {
     case 'rectangle':
-      return [
-        [element.x, element.y],
-        [element.x + element.width, element.y],
-        [element.x + element.width, element.y + element.height],
-        [element.x, element.y + element.height]
-      ];
+      const { x, y, width, height } = element;
+      return `M ${x} ${y} L ${x + width} ${y} L ${x + width} ${y + height} L ${x} ${y + height} Z`;
     
     case 'ellipse':
-      // High-resolution ellipse approximation
       const cx = element.x + element.width / 2;
       const cy = element.y + element.height / 2;
       const rx = element.width / 2;
       const ry = element.height / 2;
-      const coords = [];
+      return `M ${cx - rx} ${cy} A ${rx} ${ry} 0 0 0 ${cx + rx} ${cy} A ${rx} ${ry} 0 0 0 ${cx - rx} ${cy} Z`;
       
-      // Use adaptive resolution based on size
-      const perimeter = Math.PI * (3 * (rx + ry) - Math.sqrt((3 * rx + ry) * (rx + 3 * ry)));
-      const numPoints = Math.max(32, Math.min(128, Math.floor(perimeter / 5))); // 5 pixels per segment
-      
-      for (let i = 0; i < numPoints; i++) {
-        const angle = (i * Math.PI * 2) / numPoints;
-        coords.push([
-          cx + rx * Math.cos(angle),
-          cy + ry * Math.sin(angle)
-        ]);
-      }
-      return coords;
-    
     case 'diamond':
-      return [
-        [element.x + element.width / 2, element.y],
-        [element.x + element.width, element.y + element.height / 2],
-        [element.x + element.width / 2, element.y + element.height],
-        [element.x, element.y + element.height / 2]
-      ];
-    
+      const dcx = element.x + element.width / 2;
+      const dcy = element.y + element.height / 2;
+      return `M ${dcx} ${element.y} L ${element.x + element.width} ${dcy} L ${dcx} ${element.y + element.height} L ${element.x} ${dcy} Z`;
+      
     case 'line':
       if (element.points && element.points.length >= 3) {
-        return element.points.map(point => [
-          element.x + point[0],
-          element.y + point[1]
-        ]);
+        let path = `M ${element.x + element.points[0][0]} ${element.y + element.points[0][1]}`;
+        for (let i = 1; i < element.points.length; i++) {
+          path += ` L ${element.x + element.points[i][0]} ${element.y + element.points[i][1]}`;
+        }
+        const first = element.points[0];
+        const last = element.points[element.points.length - 1];
+        const isClosed = Math.abs(first[0] - last[0]) < 1 && Math.abs(first[1] - last[1]) < 1;
+        if (isClosed) path += ' Z';
+        return path;
       }
-      break;
-    
+      throw new Error('Line must have at least 3 points');
+      
     default:
       throw new Error(`Unsupported element type: ${element.type}`);
   }
 }
 
-// Simple convex hull algorithm (Gift wrapping)
-function convexHull(points) {
-  if (points.length < 3) return points;
-  
-  // Find the leftmost point
-  let leftmost = 0;
-  for (let i = 1; i < points.length; i++) {
-    if (points[i][0] < points[leftmost][0] || 
-        (points[i][0] === points[leftmost][0] && points[i][1] < points[leftmost][1])) {
-      leftmost = i;
+// Parse SVG path string to array format
+function parsePathString(pathString) {
+  if (!pathString) return null;
+  const paramCounts = {a: 7, c: 6, h: 1, l: 2, m: 2, r: 4, q: 4, s: 4, t: 2, v: 1, z: 0};
+  const data = [];
+  String(pathString).replace(/([astvzqmhlcr])([^astvzqmhlcr]*)/gi, function(_, command, args) {
+    const type = command.toLowerCase();
+    args = args.match(/-?[.\d]+/g) || [];
+    if (type == "m" && args.length > 2) {
+      data.push([command].concat(args.splice(0, 2)));
+      type = "l";
+      command = command == "m" ? "l" : "L";
     }
+    while (args.length >= paramCounts[type]) {
+      data.push([command].concat(args.splice(0, paramCounts[type])));
+      if (!paramCounts[type]) break;
+    }
+  });
+  return data;
+}
+
+// Convert path to absolute coordinates
+function pathToAbsolute(pathArray) {
+  if (!pathArray || !pathArray.length) return [["M", 0, 0]];
+  const res = [];
+  let x = 0, y = 0, mx = 0, my = 0, start = 0;
+  
+  if (pathArray[0][0] == "M") {
+    x = +pathArray[0][1];
+    y = +pathArray[0][2];
+    mx = x;
+    my = y;
+    start++;
+    res[0] = ["M", x, y];
   }
   
-  const hull = [];
-  let p = leftmost;
-  
-  do {
-    hull.push(points[p]);
-    let q = (p + 1) % points.length;
-    
-    for (let i = 0; i < points.length; i++) {
-      if (orientation(points[p], points[i], points[q]) === 2) {
-        q = i;
+  for (let r, pa, i = start, ii = pathArray.length; i < ii; i++) {
+    res.push(r = []);
+    pa = pathArray[i];
+    if (pa[0] != pa[0].toUpperCase()) {
+      r[0] = pa[0].toUpperCase();
+      switch (r[0]) {
+        case "A":
+          r[1] = pa[1];
+          r[2] = pa[2];
+          r[3] = pa[3];
+          r[4] = pa[4];
+          r[5] = pa[5];
+          r[6] = +(pa[6] + x);
+          r[7] = +(pa[7] + y);
+          break;
+        case "V":
+          r[1] = +pa[1] + y;
+          break;
+        case "H":
+          r[1] = +pa[1] + x;
+          break;
+        case "M":
+          mx = +pa[1] + x;
+          my = +pa[2] + y;
+        default:
+          for (let j = 1, jj = pa.length; j < jj; j++) {
+            r[j] = +pa[j] + ((j % 2) ? x : y);
+          }
+      }
+    } else {
+      for (let j = 0, jj = pa.length; j < jj; j++) {
+        r[j] = pa[j];
       }
     }
+    switch (r[0]) {
+      case "Z":
+        x = mx;
+        y = my;
+        break;
+      case "H":
+        x = r[1];
+        break;
+      case "V":
+        y = r[1];
+        break;
+      case "M":
+        mx = r[r.length - 2];
+        my = r[r.length - 1];
+      default:
+        x = r[r.length - 2];
+        y = r[r.length - 1];
+    }
+  }
+  return res;
+}
+
+// Convert path to curves only
+function path2curve(path) {
+  const p = pathToAbsolute(path);
+  const attrs = {x: 0, y: 0, bx: 0, by: 0, X: 0, Y: 0, qx: null, qy: null};
+  
+  const processPath = function(path, d) {
+    if (!path) return ["C", d.x, d.y, d.x, d.y, d.x, d.y];
+    path[0] != "T" && path[0] != "Q" && (d.qx = d.qy = null);
+    switch (path[0]) {
+      case "M":
+        d.X = path[1];
+        d.Y = path[2];
+        break;
+      case "A":
+        path = ["C"].concat(a2c.apply(0, [d.x, d.y].concat(path.slice(1))));
+        break;
+      case "S":
+        path = ["C", d.x + (d.x - d.bx), d.y + (d.y - d.by)].concat(path.slice(1));
+        break;
+      case "T":
+        d.qx = d.x + (d.x - d.qx);
+        d.qy = d.y + (d.y - d.qy);
+        path = ["C"].concat(q2c(d.x, d.y, d.qx, d.qy, path[1], path[2]));
+        break;
+      case "Q":
+        d.qx = path[1];
+        d.qy = path[2];
+        path = ["C"].concat(q2c(d.x, d.y, path[1], path[2], path[3], path[4]));
+        break;
+      case "L":
+        path = ["C"].concat(l2c(d.x, d.y, path[1], path[2]));
+        break;
+      case "H":
+        path = ["C"].concat(l2c(d.x, d.y, path[1], d.y));
+        break;
+      case "V":
+        path = ["C"].concat(l2c(d.x, d.y, d.x, path[1]));
+        break;
+      case "Z":
+        path = ["C"].concat(l2c(d.x, d.y, d.X, d.Y));
+        break;
+    }
+    return path;
+  };
+  
+  for (var i = 0, ii = p.length; i < ii; i++) {
+    p[i] && (p[i] = processPath(p[i], attrs));
+    attrs.x = p[i] && p[i][p[i].length - 2] || attrs.x;
+    attrs.y = p[i] && p[i][p[i].length - 1] || attrs.y;
+    attrs.bx = p[i] && p[i][p[i].length - 4] || attrs.x;
+    attrs.by = p[i] && p[i][p[i].length - 3] || attrs.y;
+  }
+  
+  return p;
+}
+
+// Helper functions for path conversion
+function l2c(x1, y1, x2, y2) {
+  return [x1, y1, x2, y2, x2, y2];
+}
+
+function q2c(x1, y1, ax, ay, x2, y2) {
+  const _13 = 1 / 3;
+  const _23 = 2 / 3;
+  return [
+    _13 * x1 + _23 * ax,
+    _13 * y1 + _23 * ay,
+    _13 * x2 + _23 * ax,
+    _13 * y2 + _23 * ay,
+    x2,
+    y2
+  ];
+}
+
+function a2c(x1, y1, rx, ry, angle, large_arc_flag, sweep_flag, x2, y2) {
+  // Simplified arc to cubic conversion
+  const _120 = Math.PI * 120 / 180;
+  const rad = Math.PI / 180 * (+angle || 0);
+  
+  const xy = rotate(x1, y1, -rad);
+  x1 = xy.x;
+  y1 = xy.y;
+  const xy2 = rotate(x2, y2, -rad);
+  x2 = xy2.x;
+  y2 = xy2.y;
+  
+  const x = (x1 - x2) / 2;
+  const y = (y1 - y2) / 2;
+  let h = (x * x) / (rx * rx) + (y * y) / (ry * ry);
+  if (h > 1) {
+    h = Math.sqrt(h);
+    rx = h * rx;
+    ry = h * ry;
+  }
+  const rx2 = rx * rx;
+  const ry2 = ry * ry;
+  const k = (large_arc_flag == sweep_flag ? -1 : 1) *
+          Math.sqrt(Math.abs((rx2 * ry2 - rx2 * y * y - ry2 * x * x) / (rx2 * y * y + ry2 * x * x)));
+  const cx = k * rx * y / ry + (x1 + x2) / 2;
+  const cy = k * -ry * x / rx + (y1 + y2) / 2;
+  const f1 = Math.asin(((y1 - cy) / ry).toFixed(9));
+  const f2 = Math.asin(((y2 - cy) / ry).toFixed(9));
+  
+  let df = f2 - f1;
+  if (df < 0 && sweep_flag) {
+    df += Math.PI * 2;
+  } else if (df > 0 && !sweep_flag) {
+    df -= Math.PI * 2;
+  }
+  
+  const c1 = Math.cos(f1);
+  const s1 = Math.sin(f1);
+  const c2 = Math.cos(f2);
+  const s2 = Math.sin(f2);
+  const t = Math.tan(df / 4);
+  const hx = 4 / 3 * rx * t;
+  const hy = 4 / 3 * ry * t;
+  const m1 = [x1, y1];
+  const m2 = [x1 + hx * s1, y1 - hy * c1];
+  const m3 = [x2 + hx * s2, y2 - hy * c2];
+  const m4 = [x2, y2];
+  m2[0] = 2 * m1[0] - m2[0];
+  m2[1] = 2 * m1[1] - m2[1];
+  
+  const res = [m2, m3, m4].join().split(",");
+  const newres = [];
+  for (let i = 0, ii = res.length; i < ii; i++) {
+    newres[i] = i % 2 ? rotate(res[i - 1], res[i], rad).y : rotate(res[i], res[i + 1], rad).x;
+  }
+  return newres;
+}
+
+function rotate(x, y, rad) {
+  const X = x * Math.cos(rad) - y * Math.sin(rad);
+  const Y = x * Math.sin(rad) + y * Math.cos(rad);
+  return {x: X, y: Y};
+}
+
+// Get bounding box of a bezier curve
+function bezierBBox(x1, y1, x2, y2, x3, y3, x4, y4) {
+  const tvalues = [];
+  const bounds = [[x1, x4], [y1, y4]];
+  
+  for (let i = 0; i < 2; ++i) {
+    const b = 6 * bounds[i][0] - 12 * (i ? y2 : x2) + 6 * (i ? y3 : x3);
+    const a = -3 * bounds[i][0] + 9 * (i ? y2 : x2) - 9 * (i ? y3 : x3) + 3 * bounds[i][1];
+    const c = 3 * (i ? y2 : x2) - 3 * bounds[i][0];
     
-    p = q;
-  } while (p !== leftmost);
-  
-  return hull;
-}
-
-// Calculate orientation of ordered triplet (p, q, r)
-// Returns 0 if collinear, 1 if clockwise, 2 if counterclockwise
-function orientation(p, q, r) {
-  const val = (q[1] - p[1]) * (r[0] - q[0]) - (q[0] - p[0]) * (r[1] - q[1]);
-  if (val === 0) return 0;
-  return val > 0 ? 1 : 2;
-}
-
-// Simple union: combine all points and find convex hull
-function simpleUnion(coords1, coords2) {
-  console.log('[Simple Boolean] Computing union of', coords1.length, 'and', coords2.length, 'points');
-  
-  // Combine all points
-  const allPoints = [...coords1, ...coords2];
-  
-  // Find convex hull
-  const hull = convexHull(allPoints);
-  
-  console.log('[Simple Boolean] Union result:', hull.length, 'points');
-  return hull;
-}
-
-// Simple intersection: find overlapping area
-function simpleIntersection(coords1, coords2) {
-  console.log('[Simple Boolean] Computing intersection');
-  
-  // Find points from shape1 that are inside shape2
-  const pointsInside1 = coords1.filter(point => isPointInPolygon(point, coords2));
-  // Find points from shape2 that are inside shape1
-  const pointsInside2 = coords2.filter(point => isPointInPolygon(point, coords1));
-  
-  // Find intersection points between edges
-  const intersectionPoints = findPolygonIntersections(coords1, coords2);
-  
-  // Combine all points that define the intersection
-  const allIntersectionPoints = [...pointsInside1, ...pointsInside2, ...intersectionPoints];
-  
-  if (allIntersectionPoints.length < 3) {
-    // No valid intersection
-    return [];
-  }
-  
-  // Find convex hull of intersection points
-  const intersectionHull = convexHull(allIntersectionPoints);
-  
-  console.log('[Simple Boolean] Intersection result:', intersectionHull.length, 'points');
-  return intersectionHull;
-}
-
-// Simple difference: subtract second shape from first
-function simpleDifference(coords1, coords2) {
-  console.log('[Simple Boolean] Computing difference');
-  
-  // For a simple implementation, check if shapes overlap
-  const bounds1 = getBounds(coords1);
-  const bounds2 = getBounds(coords2);
-  
-  // Check if there's any overlap
-  if (bounds1.x + bounds1.width < bounds2.x || bounds2.x + bounds2.width < bounds1.x ||
-      bounds1.y + bounds1.height < bounds2.y || bounds2.y + bounds2.height < bounds1.y) {
-    // No overlap, return first shape unchanged
-    return coords1;
-  }
-  
-  // Find points from shape1 that are NOT inside shape2
-  const pointsOutside = coords1.filter(point => !isPointInPolygon(point, coords2));
-  
-  if (pointsOutside.length < 3) {
-    // First shape is entirely inside second shape
-    return [];
-  }
-  
-  // For now, return the convex hull of points outside
-  // A proper implementation would trace the boundary
-  return convexHull(pointsOutside);
-}
-
-// Simple exclusion: symmetric difference (union minus intersection)
-function simpleExclusion(coords1, coords2) {
-  console.log('[Simple Boolean] Computing exclusion');
-  
-  // Exclusion = parts in shape1 but not shape2, plus parts in shape2 but not shape1
-  
-  // Find points from shape1 that are NOT inside shape2
-  const points1NotIn2 = coords1.filter(point => !isPointInPolygon(point, coords2));
-  
-  // Find points from shape2 that are NOT inside shape1
-  const points2NotIn1 = coords2.filter(point => !isPointInPolygon(point, coords1));
-  
-  // If one shape is entirely inside the other, return the outer shape
-  if (points1NotIn2.length === 0) {
-    // Shape1 is entirely inside shape2, return shape2
-    return coords2;
-  }
-  if (points2NotIn1.length === 0) {
-    // Shape2 is entirely inside shape1, return shape1
-    return coords1;
-  }
-  
-  // Check if shapes don't overlap at all
-  const intersectionTest = simpleIntersection(coords1, coords2);
-  if (intersectionTest.length === 0) {
-    // No overlap, return union
-    return simpleUnion(coords1, coords2);
-  }
-  
-  // For overlapping shapes, we need to create two separate regions
-  // This is a simplified approach - just combine the non-overlapping points
-  const exclusionPoints = [...points1NotIn2, ...points2NotIn1];
-  
-  if (exclusionPoints.length < 3) {
-    // Not enough points for a valid shape
-    return [];
-  }
-  
-  // Create convex hull of the exclusion points
-  // Note: This is simplified - a proper implementation would create
-  // multiple polygons or a polygon with a hole
-  const hull = convexHull(exclusionPoints);
-  
-  console.log('[Simple Boolean] Exclusion result:', hull.length, 'points');
-  return hull;
-}
-
-// Check if a point is inside a polygon
-function isPointInPolygon(point, polygon) {
-  let inside = false;
-  const x = point[0], y = point[1];
-  
-  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-    const xi = polygon[i][0], yi = polygon[i][1];
-    const xj = polygon[j][0], yj = polygon[j][1];
-    
-    const intersect = ((yi > y) !== (yj > y)) && 
-                      (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
-    if (intersect) inside = !inside;
-  }
-  
-  return inside;
-}
-
-// Find intersection points between two polygons
-function findPolygonIntersections(coords1, coords2) {
-  const intersections = [];
-  
-  // Check each edge of polygon1 against each edge of polygon2
-  for (let i = 0; i < coords1.length - 1; i++) {
-    for (let j = 0; j < coords2.length - 1; j++) {
-      const intersection = lineIntersection(
-        coords1[i], coords1[i + 1],
-        coords2[j], coords2[j + 1]
-      );
-      
-      if (intersection) {
-        intersections.push(intersection);
+    if (Math.abs(a) < 1e-12) {
+      if (Math.abs(b) > 1e-12) {
+        const t = -c / b;
+        if (0 < t && t < 1) tvalues.push(t);
+      }
+    } else {
+      const disc = b * b - 4 * c * a;
+      if (disc >= 0) {
+        const t1 = (-b + Math.sqrt(disc)) / (2 * a);
+        if (0 < t1 && t1 < 1) tvalues.push(t1);
+        const t2 = (-b - Math.sqrt(disc)) / (2 * a);
+        if (0 < t2 && t2 < 1) tvalues.push(t2);
       }
     }
   }
   
-  return intersections;
-}
-
-// Find intersection point of two line segments
-function lineIntersection(p1, p2, p3, p4) {
-  const x1 = p1[0], y1 = p1[1];
-  const x2 = p2[0], y2 = p2[1];
-  const x3 = p3[0], y3 = p3[1];
-  const x4 = p4[0], y4 = p4[1];
+  let x = x1, y = y1;
+  let minX = x1, minY = y1, maxX = x1, maxY = y1;
   
-  const denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
-  if (Math.abs(denom) < 0.001) return null; // Parallel lines
-  
-  const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denom;
-  const u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / denom;
-  
-  if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
-    return [
-      x1 + t * (x2 - x1),
-      y1 + t * (y2 - y1)
-    ];
+  for (let i = 0; i < tvalues.length; i++) {
+    const t = tvalues[i];
+    const mt = 1 - t;
+    const mt2 = mt * mt;
+    const mt3 = mt2 * mt;
+    const t2 = t * t;
+    const t3 = t2 * t;
+    
+    x = mt3 * x1 + 3 * mt2 * t * x2 + 3 * mt * t2 * x3 + t3 * x4;
+    y = mt3 * y1 + 3 * mt2 * t * y2 + 3 * mt * t2 * y3 + t3 * y4;
+    
+    minX = Math.min(x, minX);
+    minY = Math.min(y, minY);
+    maxX = Math.max(x, maxX);
+    maxY = Math.max(y, maxY);
   }
   
-  return null;
-}
-
-// Get bounding box of coordinates
-function getBounds(coords) {
-  if (coords.length === 0) return { x: 0, y: 0, width: 0, height: 0 };
-  
-  let minX = coords[0][0], maxX = coords[0][0];
-  let minY = coords[0][1], maxY = coords[0][1];
-  
-  for (let i = 1; i < coords.length; i++) {
-    minX = Math.min(minX, coords[i][0]);
-    maxX = Math.max(maxX, coords[i][0]);
-    minY = Math.min(minY, coords[i][1]);
-    maxY = Math.max(maxY, coords[i][1]);
-  }
+  minX = Math.min(x4, minX);
+  minY = Math.min(y4, minY);
+  maxX = Math.max(x4, maxX);
+  maxY = Math.max(y4, maxY);
   
   return {
     x: minX,
@@ -294,25 +328,572 @@ function getBounds(coords) {
   };
 }
 
-// Convert coordinates to Excalidraw points relative to bounds
-function coordsToPoints(coords, bounds) {
-  const points = coords.map(coord => [
-    coord[0] - bounds.x,
-    coord[1] - bounds.y
-  ]);
+// Check if two bounding boxes intersect
+function isBBoxIntersect(bbox1, bbox2) {
+  return bbox1.x <= bbox2.x + bbox2.width &&
+         bbox1.x + bbox1.width >= bbox2.x &&
+         bbox1.y <= bbox2.y + bbox2.height &&
+         bbox1.y + bbox1.height >= bbox2.y;
+}
+
+// Subdivide a bezier curve at t=0.5
+function subdivideBezier(x0, y0, x1, y1, x2, y2, x3, y3) {
+  const t = 0.5;
   
-  // Ensure the path is closed by adding the first point at the end if needed
-  if (points.length > 0) {
-    const firstPoint = points[0];
-    const lastPoint = points[points.length - 1];
+  // de Casteljau's algorithm
+  const x01 = x0 + t * (x1 - x0);
+  const y01 = y0 + t * (y1 - y0);
+  const x11 = x1 + t * (x2 - x1);
+  const y11 = y1 + t * (y2 - y1);
+  const x21 = x2 + t * (x3 - x2);
+  const y21 = y2 + t * (y3 - y2);
+  
+  const x02 = x01 + t * (x11 - x01);
+  const y02 = y01 + t * (y11 - y01);
+  const x12 = x11 + t * (x21 - x11);
+  const y12 = y11 + t * (y21 - y11);
+  
+  const x03 = x02 + t * (x12 - x02);
+  const y03 = y02 + t * (y12 - y02);
+  
+  return {
+    left: [x0, y0, x01, y01, x02, y02, x03, y03],
+    right: [x03, y03, x12, y12, x21, y21, x3, y3]
+  };
+}
+
+// Find intersections between two bezier curves with proper t parameters
+function bezierIntersect(bez1, bez2, threshold = 0.5, t1min = 0, t1max = 1, t2min = 0, t2max = 1) {
+  const bbox1 = bezierBBox(...bez1);
+  const bbox2 = bezierBBox(...bez2);
+  
+  if (!isBBoxIntersect(bbox1, bbox2)) {
+    return [];
+  }
+  
+  // If bboxes are small enough, check for intersection
+  if (Math.max(bbox1.width, bbox1.height, bbox2.width, bbox2.height) < threshold) {
+    // Use line approximation for intersection
+    const x1a = bez1[0], y1a = bez1[1];
+    const x1b = bez1[6], y1b = bez1[7];
+    const x2a = bez2[0], y2a = bez2[1];
+    const x2b = bez2[6], y2b = bez2[7];
+    
+    const denom = (x1a - x1b) * (y2a - y2b) - (y1a - y1b) * (x2a - x2b);
+    if (Math.abs(denom) < 1e-10) return [];
+    
+    const t1 = ((x1a - x2a) * (y2a - y2b) - (y1a - y2a) * (x2a - x2b)) / denom;
+    const t2 = ((x1a - x2a) * (y1a - y1b) - (y1a - y2a) * (x1a - x1b)) / denom;
+    
+    if (t1 >= -0.1 && t1 <= 1.1 && t2 >= -0.1 && t2 <= 1.1) {
+      // Calculate actual intersection point on the curves
+      const t1actual = (t1min + t1max) / 2;
+      const t2actual = (t2min + t2max) / 2;
+      
+      // Calculate point on first bezier at t1actual
+      const mt1 = 1 - t1actual;
+      const mt1_2 = mt1 * mt1;
+      const mt1_3 = mt1_2 * mt1;
+      const t1_2 = t1actual * t1actual;
+      const t1_3 = t1_2 * t1actual;
+      
+      const x = mt1_3 * bez1[0] + 3 * mt1_2 * t1actual * bez1[2] + 3 * mt1 * t1_2 * bez1[4] + t1_3 * bez1[6];
+      const y = mt1_3 * bez1[1] + 3 * mt1_2 * t1actual * bez1[3] + 3 * mt1 * t1_2 * bez1[5] + t1_3 * bez1[7];
+      
+      return [{
+        x: x,
+        y: y,
+        t1: t1actual,
+        t2: t2actual
+      }];
+    }
+    return [];
+  }
+  
+  // Subdivide both curves
+  const split1 = subdivideBezier(...bez1);
+  const split2 = subdivideBezier(...bez2);
+  const t1mid = (t1min + t1max) / 2;
+  const t2mid = (t2min + t2max) / 2;
+  
+  return [
+    ...bezierIntersect(split1.left, split2.left, threshold, t1min, t1mid, t2min, t2mid),
+    ...bezierIntersect(split1.left, split2.right, threshold, t1min, t1mid, t2mid, t2max),
+    ...bezierIntersect(split1.right, split2.left, threshold, t1mid, t1max, t2min, t2mid),
+    ...bezierIntersect(split1.right, split2.right, threshold, t1mid, t1max, t2mid, t2max)
+  ];
+}
+
+// Find all intersections between two paths
+function pathIntersection(path1, path2) {
+  const intersections = [];
+  const p1 = path2curve(parsePathString(path1));
+  const p2 = path2curve(parsePathString(path2));
+  
+  // Map curved path indices to segment indices
+  let segIndex1 = 0;
+  let segIndex2 = 0;
+  
+  for (let i = 0; i < p1.length; i++) {
+    if (p1[i][0] === "M") continue; // Skip moveto commands
+    if (p1[i][0] !== "C") continue;
+    
+    const bez1 = [p1[i][1], p1[i][2], p1[i][3], p1[i][4], p1[i][5], p1[i][6], p1[i][7], p1[i][8]];
+    segIndex2 = 0;
+    
+    for (let j = 0; j < p2.length; j++) {
+      if (p2[j][0] === "M") continue; // Skip moveto commands  
+      if (p2[j][0] !== "C") continue;
+      
+      const bez2 = [p2[j][1], p2[j][2], p2[j][3], p2[j][4], p2[j][5], p2[j][6], p2[j][7], p2[j][8]];
+      
+      const ints = bezierIntersect(bez1, bez2);
+      ints.forEach(int => {
+        int.segment1 = segIndex1;
+        int.segment2 = segIndex2;
+      });
+      intersections.push(...ints);
+      segIndex2++;
+    }
+    segIndex1++;
+  }
+  
+  console.log('[Boolean Ops] Found', intersections.length, 'intersections');
+  return intersections;
+}
+
+// Split a segment at parameter t
+function splitSegment(segment, t) {
+  if (segment.items.length === 0) return [segment];
+  
+  const [x0, y0, x1, y1, x2, y2, x3, y3] = segment.items;
+  
+  // de Casteljau's algorithm
+  const x01 = x0 + t * (x1 - x0);
+  const y01 = y0 + t * (y1 - y0);
+  const x11 = x1 + t * (x2 - x1);
+  const y11 = y1 + t * (y2 - y1);
+  const x21 = x2 + t * (x3 - x2);
+  const y21 = y2 + t * (y3 - y2);
+  
+  const x02 = x01 + t * (x11 - x01);
+  const y02 = y01 + t * (y11 - y01);
+  const x12 = x11 + t * (x21 - x11);
+  const y12 = y11 + t * (y21 - y11);
+  
+  const x03 = x02 + t * (x12 - x02);
+  const y03 = y02 + t * (y12 - y02);
+  
+  const seg1 = {
+    items: [x0, y0, x01, y01, x02, y02, x03, y03],
+    intersection: true
+  };
+  
+  const seg2 = {
+    items: [x03, y03, x12, y12, x21, y21, x3, y3],
+    intersection: true
+  };
+  
+  return [seg1, seg2];
+}
+
+// Insert intersection points into path segments
+function insertIntersectionPoints(pathSegments, pathId, intersections) {
+  // Sort intersections by segment index and t value
+  const relevantInts = intersections
+    .filter(int => int[`segment${pathId}`] !== undefined)
+    .sort((a, b) => {
+      const segDiff = a[`segment${pathId}`] - b[`segment${pathId}`];
+      if (segDiff !== 0) return segDiff;
+      return (a[`t${pathId}`] || 0.5) - (b[`t${pathId}`] || 0.5);
+    });
+  
+  // Process intersections in reverse order to maintain indices
+  for (let i = relevantInts.length - 1; i >= 0; i--) {
+    const int = relevantInts[i];
+    const segIndex = int[`segment${pathId}`];
+    const t = int[`t${pathId}`] || 0.5;
+    
+    if (segIndex < pathSegments.length) {
+      const splits = splitSegment(pathSegments[segIndex], t);
+      pathSegments.splice(segIndex, 1, ...splits);
+    }
+  }
+}
+
+// Generate path segments from curved path
+function generatePathSegments(path) {
+  const segments = [];
+  
+  path.forEach((pathCommand, i) => {
+    let seg = {
+      items: [],
+    };
+    
+    if (pathCommand[0] !== "M") {
+      const prevCommand = path[i - 1];
+      const prevCommandLength = prevCommand.length;
+      
+      seg = {
+        items: [
+          prevCommand[prevCommandLength - 2],
+          prevCommand[prevCommandLength - 1],
+          ...pathCommand.slice(1),
+        ],
+      };
+    }
+    
+    if (i > 0) {
+      segments.push(seg);
+    }
+  });
+  
+  return segments;
+}
+
+// Check if a point is inside a path
+function isPointInsidePath(path, x, y) {
+  const pathArray = path2curve(parsePathString(path));
+  let inside = false;
+  
+  for (let i = 0, ii = pathArray.length; i < ii; i++) {
+    const seg = pathArray[i];
+    if (seg[0] === "C") {
+      // Simplified - treat bezier as line from start to end
+      const y1 = seg[2];
+      const y2 = seg[6];
+      if ((y1 > y) !== (y2 > y)) {
+        const x1 = seg[1];
+        const x2 = seg[5];
+        const slope = (x2 - x1) / (y2 - y1);
+        if (x < slope * (y - y1) + x1) {
+          inside = !inside;
+        }
+      }
+    }
+  }
+  
+  return inside;
+}
+
+// Check if a segment is inside a path
+function isSegInsidePath(segment, path2) {
+  if (segment.items.length === 0) return false;
+  
+  // Check midpoint of segment
+  const t = 0.5;
+  const [x0, y0, x1, y1, x2, y2, x3, y3] = segment.items;
+  
+  // Calculate point on bezier at t=0.5
+  const mt = 1 - t;
+  const mt2 = mt * mt;
+  const mt3 = mt2 * mt;
+  const t2 = t * t;
+  const t3 = t2 * t;
+  
+  const x = mt3 * x0 + 3 * mt2 * t * x1 + 3 * mt * t2 * x2 + t3 * x3;
+  const y = mt3 * y0 + 3 * mt2 * t * y1 + 3 * mt * t2 * y2 + t3 * y3;
+  
+  return isPointInsidePath(path2, x, y);
+}
+
+// Build new path parts based on boolean operation rules
+function buildNewPathParts(type, path1Segs, path2Segs, path1String, path2String) {
+  const rules = {
+    union: { 0: false, 1: false },
+    difference: { 0: false, 1: true },
+    intersection: { 0: true, 1: true },
+  };
+  
+  const rule = rules[type];
+  const newParts = [[], []];
+  
+  // Process path1 segments
+  path1Segs.forEach((segment) => {
+    if (segment.items.length === 0) return;
+    
+    const isInside = isSegInsidePath(segment, path2String);
+    const keep = rule[0] ? isInside : !isInside;
+    
+    if (keep) {
+      newParts[0].push(segment);
+    }
+  });
+  
+  // Process path2 segments
+  path2Segs.forEach((segment) => {
+    if (segment.items.length === 0) return;
+    
+    const isInside = isSegInsidePath(segment, path1String);
+    const keep = rule[1] ? isInside : !isInside;
+    
+    if (keep) {
+      newParts[1].push(segment);
+    }
+  });
+  
+  return newParts;
+}
+
+// Build connected path from segments
+function buildConnectedPath(segments) {
+  if (segments.length === 0) return [];
+  
+  const result = [];
+  const used = new Array(segments.length).fill(false);
+  let currentIndex = 0;
+  
+  // Start with the first segment
+  const firstSeg = segments[0];
+  if (firstSeg.items.length > 0) {
+    result.push(["M", firstSeg.items[0], firstSeg.items[1]]);
+    result.push(["C", ...firstSeg.items.slice(2)]);
+    used[0] = true;
+  }
+  
+  // Current end point
+  let currentX = firstSeg.items[6];
+  let currentY = firstSeg.items[7];
+  let segmentsAdded = 1;
+  
+  // Try to connect segments
+  while (segmentsAdded < segments.length) {
+    let found = false;
+    const threshold = 0.1;
+    
+    for (let i = 0; i < segments.length; i++) {
+      if (used[i] || segments[i].items.length === 0) continue;
+      
+      const seg = segments[i];
+      const startX = seg.items[0];
+      const startY = seg.items[1];
+      const endX = seg.items[6];
+      const endY = seg.items[7];
+      
+      // Check if this segment connects to current point
+      const distToStart = Math.sqrt(Math.pow(startX - currentX, 2) + Math.pow(startY - currentY, 2));
+      const distToEnd = Math.sqrt(Math.pow(endX - currentX, 2) + Math.pow(endY - currentY, 2));
+      
+      if (distToStart < threshold) {
+        // Connect normally
+        result.push(["C", ...seg.items.slice(2)]);
+        currentX = endX;
+        currentY = endY;
+        used[i] = true;
+        segmentsAdded++;
+        found = true;
+        break;
+      } else if (distToEnd < threshold) {
+        // Connect in reverse
+        result.push(["C", seg.items[4], seg.items[5], seg.items[2], seg.items[3], seg.items[0], seg.items[1]]);
+        currentX = startX;
+        currentY = startY;
+        used[i] = true;
+        segmentsAdded++;
+        found = true;
+        break;
+      }
+    }
+    
+    if (!found) {
+      // Find nearest unused segment
+      let minDist = Infinity;
+      let nearestIdx = -1;
+      
+      for (let i = 0; i < segments.length; i++) {
+        if (used[i] || segments[i].items.length === 0) continue;
+        
+        const seg = segments[i];
+        const dist = Math.sqrt(Math.pow(seg.items[0] - currentX, 2) + Math.pow(seg.items[1] - currentY, 2));
+        if (dist < minDist) {
+          minDist = dist;
+          nearestIdx = i;
+        }
+      }
+      
+      if (nearestIdx >= 0) {
+        const seg = segments[nearestIdx];
+        // Add a line to connect if needed
+        if (minDist > threshold) {
+          result.push(["L", seg.items[0], seg.items[1]]);
+        }
+        result.push(["C", ...seg.items.slice(2)]);
+        currentX = seg.items[6];
+        currentY = seg.items[7];
+        used[nearestIdx] = true;
+        segmentsAdded++;
+      } else {
+        break;
+      }
+    }
+  }
+  
+  return result;
+}
+
+// Convert segments to path array
+function pathSegsToArr(segments) {
+  return buildConnectedPath(segments);
+}
+
+// Convert path array to string
+function pathArrayToString(pathArray) {
+  let str = "";
+  pathArray.forEach((cmd) => {
+    str += cmd[0];
+    for (let i = 1; i < cmd.length; i++) {
+      str += cmd[i];
+      if (i < cmd.length - 1) str += " ";
+    }
+    str += " ";
+  });
+  return str;
+}
+
+// Main boolean operation function
+function operateBool(type, path1, path2) {
+  const path1Array = parsePathString(path1);
+  const path2Array = parsePathString(path2);
+  
+  const path1Curved = path2curve(path1Array);
+  const path2Curved = path2curve(path2Array);
+  
+  const path1Segs = generatePathSegments(path1Curved);
+  const path2Segs = generatePathSegments(path2Curved);
+  
+  // Find intersections between the two paths
+  const intersections = pathIntersection(path1, path2);
+  
+  // Insert intersection points into both paths
+  if (intersections.length > 0) {
+    console.log('[Boolean Ops] Inserting intersections into paths');
+    insertIntersectionPoints(path1Segs, 1, intersections);
+    insertIntersectionPoints(path2Segs, 2, intersections);
+    console.log('[Boolean Ops] Path1 segments after split:', path1Segs.length);
+    console.log('[Boolean Ops] Path2 segments after split:', path2Segs.length);
+  }
+  
+  const newParts = buildNewPathParts(type, path1Segs, path2Segs, path1, path2);
+  console.log('[Boolean Ops] New parts:', newParts[0].length, 'from path1,', newParts[1].length, 'from path2');
+  
+  // Combine all parts
+  const allSegments = [...newParts[0], ...newParts[1]];
+  
+  return {
+    data: pathSegsToArr(allSegments),
+  };
+}
+
+// Boolean operation functions
+function union(path1, path2) {
+  return operateBool("union", path1, path2);
+}
+
+function difference(path1, path2) {
+  return operateBool("difference", path1, path2);
+}
+
+function intersection(path1, path2) {
+  return operateBool("intersection", path1, path2);
+}
+
+function exclusion(path1, path2) {
+  // Exclusion is (A ∪ B) - (A ∩ B)
+  const u = union(path1, path2);
+  const i = intersection(path1, path2);
+  
+  if (i.data.length === 0) {
+    return u;
+  }
+  
+  const uPath = pathArrayToString(u.data);
+  const iPath = pathArrayToString(i.data);
+  
+  return difference(uPath, iPath);
+}
+
+// Get bounds from path data
+function getPathBounds(pathData) {
+  let minX = Infinity, minY = Infinity;
+  let maxX = -Infinity, maxY = -Infinity;
+  
+  pathData.forEach(segment => {
+    if (segment[0] === 'M' || segment[0] === 'L') {
+      minX = Math.min(minX, segment[1]);
+      maxX = Math.max(maxX, segment[1]);
+      minY = Math.min(minY, segment[2]);
+      maxY = Math.max(maxY, segment[2]);
+    } else if (segment[0] === 'C') {
+      // For cubic bezier, check all control points and end point
+      for (let i = 1; i < segment.length; i += 2) {
+        minX = Math.min(minX, segment[i]);
+        maxX = Math.max(maxX, segment[i]);
+        minY = Math.min(minY, segment[i + 1]);
+        maxY = Math.max(maxY, segment[i + 1]);
+      }
+    }
+  });
+  
+  return {
+    x: minX,
+    y: minY,
+    width: maxX - minX,
+    height: maxY - minY
+  };
+}
+
+// Convert path data to Excalidraw points
+function pathDataToPoints(pathData, bounds) {
+  const points = [];
+  let currentX = 0, currentY = 0;
+  
+  pathData.forEach(segment => {
+    if (segment[0] === 'M') {
+      currentX = segment[1];
+      currentY = segment[2];
+      points.push([currentX - bounds.x, currentY - bounds.y]);
+    } else if (segment[0] === 'L') {
+      currentX = segment[1];
+      currentY = segment[2];
+      points.push([currentX - bounds.x, currentY - bounds.y]);
+    } else if (segment[0] === 'C') {
+      // Sample the cubic bezier at several points
+      const steps = 10;
+      for (let i = 1; i <= steps; i++) {
+        const t = i / steps;
+        const mt = 1 - t;
+        const mt2 = mt * mt;
+        const mt3 = mt2 * mt;
+        const t2 = t * t;
+        const t3 = t2 * t;
+        
+        const x = mt3 * currentX + 
+                  3 * mt2 * t * segment[1] + 
+                  3 * mt * t2 * segment[3] + 
+                  t3 * segment[5];
+        const y = mt3 * currentY + 
+                  3 * mt2 * t * segment[2] + 
+                  3 * mt * t2 * segment[4] + 
+                  t3 * segment[6];
+        
+        points.push([x - bounds.x, y - bounds.y]);
+      }
+      currentX = segment[5];
+      currentY = segment[6];
+    }
+  });
+  
+  // Ensure the path is closed if needed
+  if (points.length > 2) {
+    const first = points[0];
+    const last = points[points.length - 1];
     const distance = Math.sqrt(
-      Math.pow(firstPoint[0] - lastPoint[0], 2) + 
-      Math.pow(firstPoint[1] - lastPoint[1], 2)
+      Math.pow(first[0] - last[0], 2) + 
+      Math.pow(first[1] - last[1], 2)
     );
     
-    // Only add closing point if it's not already close enough
     if (distance > 0.1) {
-      points.push([firstPoint[0], firstPoint[1]]);
+      points.push([first[0], first[1]]);
     }
   }
   
@@ -329,51 +910,53 @@ function generateId() {
   return id;
 }
 
-// Main entry point for simple boolean operations
+// Main entry point for boolean operations
 window.performExcalidrawBooleanOp = function(elements, operation) {
-  console.log('[Simple Boolean] Starting operation:', operation, 'on', elements.length, 'elements');
+  console.log('[Boolean Ops] Starting operation:', operation, 'on', elements.length, 'elements');
   
   if (elements.length !== 2) {
     throw new Error('Boolean operations require exactly 2 elements');
   }
   
   try {
-    // Convert elements to coordinate arrays
-    const coords1 = elementToCoords(elements[0]);
-    const coords2 = elementToCoords(elements[1]);
+    // Convert elements to SVG paths
+    const path1 = elementToPath(elements[0]);
+    const path2 = elementToPath(elements[1]);
     
-    console.log('[Simple Boolean] Element 1 coords:', coords1);
-    console.log('[Simple Boolean] Element 2 coords:', coords2);
+    console.log('[Boolean Ops] Path 1:', path1);
+    console.log('[Boolean Ops] Path 2:', path2);
     
     // Perform the operation
-    let resultCoords;
+    let result;
     switch (operation) {
       case 'union':
-        resultCoords = simpleUnion(coords1, coords2);
+        result = union(path1, path2);
         break;
       case 'intersection':
-        resultCoords = simpleIntersection(coords1, coords2);
+        result = intersection(path1, path2);
         break;
       case 'difference':
-        resultCoords = simpleDifference(coords1, coords2);
+        result = difference(path1, path2);
         break;
       case 'exclusion':
-        resultCoords = simpleExclusion(coords1, coords2);
+        result = exclusion(path1, path2);
         break;
       default:
         throw new Error(`Unsupported operation: ${operation}`);
     }
     
-    if (resultCoords.length === 0) {
+    console.log('[Boolean Ops] Result:', result);
+    
+    if (!result || !result.data || result.data.length === 0) {
       throw new Error('Operation resulted in empty shape');
     }
     
     // Get bounds and convert to Excalidraw format
-    const bounds = getBounds(resultCoords);
-    const points = coordsToPoints(resultCoords, bounds);
+    const bounds = getPathBounds(result.data);
+    const points = pathDataToPoints(result.data, bounds);
     
-    console.log('[Simple Boolean] Result bounds:', bounds);
-    console.log('[Simple Boolean] Result points:', points);
+    console.log('[Boolean Ops] Result bounds:', bounds);
+    console.log('[Boolean Ops] Result points:', points);
     
     // Create new element
     const firstElement = elements[0];
@@ -413,7 +996,7 @@ window.performExcalidrawBooleanOp = function(elements, operation) {
       index: 'a0'
     };
   } catch (error) {
-    console.error('[Simple Boolean] Error:', error);
+    console.error('[Boolean Ops] Error:', error);
     throw error;
   }
 };
