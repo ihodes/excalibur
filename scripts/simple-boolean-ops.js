@@ -506,7 +506,7 @@ function splitSegment(segment, t, intersection) {
 }
 
 // Insert intersection points into path segments
-function insertIntersectionPoints(pathSegments, pathId, intersections) {
+function insertIntersectionPoints(pathSegments, pathId, intersections, allIntersections, otherPathId) {
   // Sort intersections by segment index and t value
   const relevantInts = intersections
     .filter(int => int[`segment${pathId}`] !== undefined)
@@ -528,6 +528,25 @@ function insertIntersectionPoints(pathSegments, pathId, intersections) {
       // Mark the intersection point on both split segments
       splits[0].intersectionEnd = true;
       splits[1].intersectionStart = true;
+      
+      // Store connectivity information
+      // The segment ending at the intersection connects TO the other path
+      splits[0].connectsTo = {
+        pathId: otherPathId,
+        segmentIndex: int[`segment${otherPathId}`],
+        intersectionId: allIntersections.indexOf(int),
+        x: int.x,
+        y: int.y
+      };
+      // The segment starting at the intersection connects FROM the other path
+      splits[1].connectsFrom = {
+        pathId: otherPathId,
+        segmentIndex: int[`segment${otherPathId}`],
+        intersectionId: allIntersections.indexOf(int),
+        x: int.x,
+        y: int.y
+      };
+      
       pathSegments.splice(segIndex, 1, ...splits);
       
       // Update indices for remaining intersections
@@ -684,6 +703,7 @@ function buildNewPathParts(type, path1Segs, path2Segs, path1String, path2String)
     if (keep) {
       segment.pathId = 1;
       segment.originalIndex = idx;
+      segment.currentIndex = newParts[0].length;
       newParts[0].push(segment);
     }
   });
@@ -698,6 +718,7 @@ function buildNewPathParts(type, path1Segs, path2Segs, path1String, path2String)
     if (keep) {
       segment.pathId = 2;
       segment.originalIndex = idx;
+      segment.currentIndex = newParts[1].length;
       newParts[1].push(segment);
       
       // Track inversions for difference operation
@@ -768,20 +789,28 @@ function buildPartIndexes(parts, intersections) {
 function buildPath(type, parts, indexes, inversions, startIndex = 0) {
   const paths = [];
   const allSegments = [];
+  const segmentMap = new Map(); // Map to quickly find segments
   
   // Collect all segments from both parts
   parts.forEach((pathParts, partIndex) => {
     pathParts.forEach((segment, segIndex) => {
       if (segment.items.length > 0) {
-        allSegments.push({
+        const segInfo = {
           segment: segment,
           partIndex: partIndex,
-          segIndex: segIndex,
+          segIndex: segment.currentIndex !== undefined ? segment.currentIndex : segIndex,
           used: false
-        });
+        };
+        allSegments.push(segInfo);
+        
+        // Create mapping for quick lookup
+        const key = `${partIndex}_${segInfo.segIndex}`;
+        segmentMap.set(key, segInfo);
       }
     });
   });
+  
+  console.log('[Boolean Ops] Total segments to process:', allSegments.length);
   
   // Build paths by following connections
   while (true) {
@@ -798,63 +827,85 @@ function buildPath(type, parts, indexes, inversions, startIndex = 0) {
     
     const currentPath = [];
     let current = startSeg;
-    const visited = new Set();
     
     // Trace path from this starting segment
     while (current && !current.used) {
       current.used = true;
       currentPath.push(current.segment);
       
-      // Find next segment
-      const currentEnd = [current.segment.items[6], current.segment.items[7]];
       let nextSeg = null;
-      let minDist = 0.1; // threshold
       
-      // First, look for connecting segment from same path
-      for (let i = 0; i < allSegments.length; i++) {
-        if (allSegments[i].used) continue;
+      // Check if we have explicit connectivity information
+      if (current.segment.connectsTo && current.segment.connectsTo.actualSegmentIndex !== undefined) {
+        // We're at an intersection - use stored connectivity
+        const connectInfo = current.segment.connectsTo;
+        console.log('[Boolean Ops] At intersection, looking for connected segment from path', connectInfo.pathId, 'index', connectInfo.actualSegmentIndex);
         
-        const seg = allSegments[i];
-        const segStart = [seg.segment.items[0], seg.segment.items[1]];
-        const dist = Math.sqrt(
-          Math.pow(currentEnd[0] - segStart[0], 2) + 
-          Math.pow(currentEnd[1] - segStart[1], 2)
-        );
-        
-        if (dist < minDist) {
-          // At intersection, apply boolean operation rules
-          if (current.segment.intersectionEnd && seg.segment.intersectionStart) {
-            // We're at an intersection - decide which path to follow
+        // Find the connected segment using the actual index
+        for (let i = 0; i < allSegments.length; i++) {
+          const seg = allSegments[i];
+          if (!seg.used && 
+              seg.partIndex === (connectInfo.pathId - 1) && 
+              seg.segIndex === connectInfo.actualSegmentIndex) {
+            
+            // Apply boolean operation rules at intersection
             if (type === 'union') {
-              // For union, prefer segments from different paths
+              // For union, switch to the other path
               if (seg.partIndex !== current.partIndex) {
                 nextSeg = seg;
+                console.log('[Boolean Ops] Union: switching to other path');
                 break;
               }
             } else if (type === 'intersection') {
-              // For intersection, prefer segments from same path
-              if (seg.partIndex === current.partIndex) {
-                nextSeg = seg;
-                break;
+              // For intersection, prefer staying on same path
+              // Look for continuation on same path first
+              let samePath = null;
+              for (let j = 0; j < allSegments.length; j++) {
+                const altSeg = allSegments[j];
+                if (!altSeg.used && altSeg.partIndex === current.partIndex) {
+                  const altStart = [altSeg.segment.items[0], altSeg.segment.items[1]];
+                  const currentEnd = [current.segment.items[6], current.segment.items[7]];
+                  const dist = Math.sqrt(
+                    Math.pow(currentEnd[0] - altStart[0], 2) + 
+                    Math.pow(currentEnd[1] - altStart[1], 2)
+                  );
+                  if (dist < 0.1) {
+                    samePath = altSeg;
+                    break;
+                  }
+                }
               }
-            } else if (type === 'difference') {
-              // For difference, follow specific rules
-              if (current.partIndex === 0 && seg.partIndex !== current.partIndex) {
-                // From path1, switch to path2
-                nextSeg = seg;
-                break;
-              } else if (current.partIndex === 1 && seg.partIndex === current.partIndex) {
-                // From path2, stay on path2
-                nextSeg = seg;
-                break;
-              }
+              nextSeg = samePath || seg;
             }
-          } else if (seg.partIndex === current.partIndex) {
-            // Not at intersection, prefer same path
-            nextSeg = seg;
-          } else if (!nextSeg) {
-            // If no same-path segment found, consider other path
-            nextSeg = seg;
+          }
+        }
+      }
+      
+      // If no explicit connection, look for nearby segments
+      if (!nextSeg) {
+        const currentEnd = [current.segment.items[6], current.segment.items[7]];
+        let minDist = 0.1; // threshold
+        
+        // Look for connecting segment
+        for (let i = 0; i < allSegments.length; i++) {
+          if (allSegments[i].used) continue;
+          
+          const seg = allSegments[i];
+          const segStart = [seg.segment.items[0], seg.segment.items[1]];
+          const dist = Math.sqrt(
+            Math.pow(currentEnd[0] - segStart[0], 2) + 
+            Math.pow(currentEnd[1] - segStart[1], 2)
+          );
+          
+          if (dist < minDist) {
+            // Prefer same path when not at intersection
+            if (seg.partIndex === current.partIndex) {
+              nextSeg = seg;
+              minDist = dist;
+            } else if (!nextSeg) {
+              nextSeg = seg;
+              minDist = dist;
+            }
           }
         }
       }
@@ -863,6 +914,7 @@ function buildPath(type, parts, indexes, inversions, startIndex = 0) {
     }
     
     if (currentPath.length > 0) {
+      console.log('[Boolean Ops] Built path with', currentPath.length, 'segments');
       paths.push(currentPath);
     }
   }
@@ -941,8 +993,39 @@ function operateBool(type, path1, path2) {
   // Insert intersection points into both paths
   if (intersections.length > 0) {
     console.log('[Boolean Ops] Inserting intersections into paths');
-    insertIntersectionPoints(path1Segs, 1, intersections);
-    insertIntersectionPoints(path2Segs, 2, intersections);
+    
+    // Create a map to track segment relationships through splits
+    const connectionMap = new Map();
+    
+    // First, insert intersections into path1
+    insertIntersectionPoints(path1Segs, 1, intersections, intersections, 2);
+    
+    // Then insert into path2
+    insertIntersectionPoints(path2Segs, 2, intersections, intersections, 1);
+    
+    // Now update connectivity to account for split segments
+    // After splitting, we need to match up the split segments
+    path1Segs.forEach((seg, idx) => {
+      if (seg.connectsTo) {
+        // Find the matching segment in path2
+        const targetIntersectionId = seg.connectsTo.intersectionId;
+        const targetX = seg.connectsTo.x;
+        const targetY = seg.connectsTo.y;
+        
+        // Find path2 segment with matching intersection
+        for (let j = 0; j < path2Segs.length; j++) {
+          const seg2 = path2Segs[j];
+          if (seg2.connectsFrom && 
+              seg2.connectsFrom.intersectionId === targetIntersectionId) {
+            // Update the connection indices
+            seg.connectsTo.actualSegmentIndex = j;
+            seg2.connectsFrom.actualSegmentIndex = idx;
+            break;
+          }
+        }
+      }
+    });
+    
     console.log('[Boolean Ops] Path1 segments after split:', path1Segs.length);
     console.log('[Boolean Ops] Path2 segments after split:', path2Segs.length);
   }
