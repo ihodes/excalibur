@@ -241,7 +241,7 @@
     if (selectedIds.length > 0 && elements) {
       const selectedElements = elements.filter(el => selectedIds.includes(el.id));
       elementsHash = selectedElements.map(el =>
-        `${el.id}:${el.x}:${el.y}:${JSON.stringify(el.points || [])}`
+        `${el.id}:${el.x}:${el.y}:${el.width || 0}:${el.height || 0}:${JSON.stringify(el.points || [])}`
       ).join('|');
     }
 
