@@ -59,38 +59,6 @@
     return (A[0] - O[0]) * (B[1] - O[1]) - (A[1] - O[1]) * (B[0] - O[0]);
   }
 
-  // Convex hull using Andrew's monotone chain algorithm
-  function convexHull(points) {
-    points = [...points];
-    points.sort((a, b) => a[0] === b[0] ? a[1] - b[1] : a[0] - b[0]);
-    
-    if (points.length <= 1) return points;
-    
-    // Build lower hull
-    const lower = [];
-    for (let i = 0; i < points.length; i++) {
-      while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], points[i]) <= 0) {
-        lower.pop();
-      }
-      lower.push(points[i]);
-    }
-    
-    // Build upper hull
-    const upper = [];
-    for (let i = points.length - 1; i >= 0; i--) {
-      while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], points[i]) <= 0) {
-        upper.pop();
-      }
-      upper.push(points[i]);
-    }
-    
-    // Remove last point of each half because it's repeated
-    lower.pop();
-    upper.pop();
-    
-    return lower.concat(upper);
-  }
-
   // Check if point is inside polygon (works for both convex and concave)
   function pointInPolygon(point, polygon) {
     let inside = false;
@@ -106,18 +74,6 @@
     }
     
     return inside;
-  }
-  
-  // Check if point is inside convex polygon (kept for compatibility)
-  function pointInConvexPolygon(point, polygon) {
-    for (let i = 0; i < polygon.length; i++) {
-      const a = polygon[i];
-      const b = polygon[(i + 1) % polygon.length];
-      if (cross(a, b, point) < 0) {
-        return false;
-      }
-    }
-    return true;
   }
 
   // Find intersection points between two line segments
@@ -366,41 +322,88 @@
     return area / 2;
   }
 
-  // Polygon intersection for convex polygons
-  function convexPolygonIntersection(poly1, poly2) {
-    let outputList = [...poly1];
+  // Ensure counter-clockwise winding order
+  function ensureCCW(polygon) {
+    const area = polygonArea(polygon);
+    if (area < 0) {
+      return [...polygon].reverse();
+    }
+    return polygon;
+  }
+
+  // Sort points by angle from centroid
+  function sortPointsByAngle(points) {
+    if (points.length === 0) return [];
     
-    for (let i = 0; i < poly2.length; i++) {
-      const inputList = outputList;
-      outputList = [];
-      
-      if (inputList.length === 0) break;
-      
-      const A = poly2[i];
-      const B = poly2[(i + 1) % poly2.length];
-      
-      for (let j = 0; j < inputList.length; j++) {
-        const C = inputList[j];
-        const D = inputList[(j + 1) % inputList.length];
-        
-        const crossAC = cross(A, B, C);
-        const crossAD = cross(A, B, D);
-        
-        if (crossAC >= 0) {
-          outputList.push(C);
-        }
-        
-        if ((crossAC >= 0 && crossAD < 0) || (crossAC < 0 && crossAD >= 0)) {
-          const intersection = lineIntersection(A, B, C, D);
-          if (intersection) {
-            outputList.push(intersection);
-          }
+    // Calculate centroid
+    const cx = points.reduce((sum, p) => sum + p[0], 0) / points.length;
+    const cy = points.reduce((sum, p) => sum + p[1], 0) / points.length;
+    
+    // Sort by angle
+    return points.sort((a, b) => {
+      const angleA = Math.atan2(a[1] - cy, a[0] - cx);
+      const angleB = Math.atan2(b[1] - cy, b[0] - cx);
+      return angleA - angleB;
+    });
+  }
+
+  // Simple polygon intersection
+  function polygonIntersection(poly1, poly2) {
+    const resultPoints = [];
+    
+    console.log('[BooleanOps] Intersection - poly1:', poly1);
+    console.log('[BooleanOps] Intersection - poly2:', poly2);
+    
+    // Add vertices from poly1 that are inside poly2
+    for (const vertex of poly1) {
+      if (pointInPolygon(vertex, poly2)) {
+        resultPoints.push([...vertex]);
+        console.log('[BooleanOps] Vertex from poly1 inside poly2:', vertex);
+      }
+    }
+    
+    // Add vertices from poly2 that are inside poly1
+    for (const vertex of poly2) {
+      if (pointInPolygon(vertex, poly1)) {
+        // Check if this point is already added (avoid duplicates)
+        const exists = resultPoints.some(p => 
+          Math.abs(p[0] - vertex[0]) < 1e-10 && 
+          Math.abs(p[1] - vertex[1]) < 1e-10
+        );
+        if (!exists) {
+          resultPoints.push([...vertex]);
+          console.log('[BooleanOps] Vertex from poly2 inside poly1:', vertex);
         }
       }
     }
     
-    return outputList;
+    // Add all intersection points
+    const intersections = findPolygonIntersections(poly1, poly2);
+    console.log('[BooleanOps] Found', intersections.length, 'intersection points');
+    for (const inter of intersections) {
+      // Check if this point is already added (avoid duplicates)
+      const exists = resultPoints.some(p => 
+        Math.abs(p[0] - inter.point[0]) < 1e-10 && 
+        Math.abs(p[1] - inter.point[1]) < 1e-10
+      );
+      if (!exists) {
+        resultPoints.push([...inter.point]);
+        console.log('[BooleanOps] Intersection point:', inter.point);
+      }
+    }
+    
+    console.log('[BooleanOps] Total result points before sorting:', resultPoints.length, resultPoints);
+    
+    if (resultPoints.length < 3) {
+      return [];
+    }
+    
+    // Sort points to form a proper polygon
+    const sorted = sortPointsByAngle(resultPoints);
+    console.log('[BooleanOps] Sorted result points:', sorted);
+    return sorted;
   }
+
 
   // Get bounds from points
   function getPointsBounds(points) {
@@ -452,13 +455,6 @@
       console.log('[BooleanOps] Points from element 1:', points1.length);
       console.log('[BooleanOps] Points from element 2:', points2.length);
       
-      // Compute convex hulls
-      const hull1 = convexHull(points1);
-      const hull2 = convexHull(points2);
-      
-      console.log('[BooleanOps] Hull 1 points:', hull1.length);
-      console.log('[BooleanOps] Hull 2 points:', hull2.length);
-      
       let resultPoints = [];
       
       switch (operation) {
@@ -468,23 +464,22 @@
           break;
           
         case 'intersection':
-          // Intersection of two convex polygons
-          resultPoints = convexPolygonIntersection(hull1, hull2);
+          // Use Sutherland-Hodgman clipping algorithm
+          resultPoints = polygonIntersection(points1, points2);
           break;
           
         case 'difference':
-          // For difference, we need points from hull1 that are not in hull2
-          // This is approximate for convex hulls
-          resultPoints = hull1.filter(p => !pointInConvexPolygon(p, hull2));
+          // For difference, we need points from points1 that are not in points2
+          resultPoints = points1.filter(p => !pointInPolygon(p, points2));
           
           // Find intersection edges and add them
-          for (let i = 0; i < hull1.length; i++) {
-            const a = hull1[i];
-            const b = hull1[(i + 1) % hull1.length];
+          for (let i = 0; i < points1.length; i++) {
+            const a = points1[i];
+            const b = points1[(i + 1) % points1.length];
             
-            for (let j = 0; j < hull2.length; j++) {
-              const c = hull2[j];
-              const d = hull2[(j + 1) % hull2.length];
+            for (let j = 0; j < points2.length; j++) {
+              const c = points2[j];
+              const d = points2[(j + 1) % points2.length];
               
               const intersection = lineIntersection(a, b, c, d);
               if (intersection) {
@@ -492,22 +487,31 @@
               }
             }
           }
-          
-          resultPoints = convexHull(resultPoints);
           break;
           
         case 'exclusion':
           // Exclusion is union minus intersection
-          const unionHull = convexHull([...points1, ...points2]);
-          const intersection = convexPolygonIntersection(hull1, hull2);
+          const unionResult = polygonUnion(points1, points2);
           
-          if (intersection.length === 0) {
-            resultPoints = unionHull;
-          } else {
-            // This is approximate - we just use the union hull
-            // True exclusion with convex hulls is complex
-            resultPoints = unionHull;
+          // Find intersection points
+          const intersectionPoints = [];
+          
+          // Add points from poly1 that are inside poly2
+          for (const p of points1) {
+            if (pointInPolygon(p, points2)) {
+              intersectionPoints.push(p);
+            }
           }
+          
+          // Add points from poly2 that are inside poly1
+          for (const p of points2) {
+            if (pointInPolygon(p, points1)) {
+              intersectionPoints.push(p);
+            }
+          }
+          
+          // For now, just return the union as exclusion is complex
+          resultPoints = unionResult;
           break;
           
         default:
