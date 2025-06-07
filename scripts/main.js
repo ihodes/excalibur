@@ -397,6 +397,13 @@ function handleBooleanOpResult(data) {
 // Start
 waitForExcalidraw();
 
+// Load scale handler
+setTimeout(() => {
+  const scaleScript = document.createElement('script');
+  scaleScript.src = chrome.runtime.getURL('scripts/scale-handler.js');
+  document.head.appendChild(scaleScript);
+}, 1500);
+
 // For easier debugging, inject the debug helper
 setTimeout(() => {
   const debugScript = document.createElement('script');
