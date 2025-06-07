@@ -174,6 +174,12 @@
     return intersections;
   }
   
+  // Helper function to check if a segment midpoint is inside the other polygon
+  function isSegmentOutside(p1, p2, polygon) {
+    const midpoint = [(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2];
+    return !pointInPolygon(midpoint, polygon);
+  }
+
   // Proper polygon union algorithm
   function polygonUnion(poly1, poly2) {
     // Find all intersections
@@ -188,57 +194,176 @@
       if (poly1Inside) return poly2;
       if (poly2Inside) return poly1;
       
-      // Disjoint polygons - for now return convex hull as fallback
-      return convexHull([...poly1, ...poly2]);
+      // Disjoint polygons - can't create a single union
+      // Return the larger polygon as a fallback
+      const area1 = Math.abs(polygonArea(poly1));
+      const area2 = Math.abs(polygonArea(poly2));
+      return area1 > area2 ? poly1 : poly2;
     }
     
-    // Simple approach: if polygons intersect, use a weighted merge
-    // This is a simplified version that works well for common cases
-    const result = [];
-    const visited = new Set();
+    // Build a graph of boundary segments
+    const segments = [];
     
-    // Add all vertices from poly1 that are outside poly2
+    // Add segments from poly1
     for (let i = 0; i < poly1.length; i++) {
-      if (!pointInPolygon(poly1[i], poly2)) {
-        result.push(poly1[i]);
+      const start = poly1[i];
+      const end = poly1[(i + 1) % poly1.length];
+      const edgeInters = [];
+      
+      // Find intersections on this edge
+      for (const inter of intersections) {
+        if (inter.edge1 === i) {
+          edgeInters.push(inter.point);
+        }
+      }
+      
+      // Sort intersections along the edge
+      edgeInters.sort((a, b) => {
+        const distA = (a[0] - start[0]) * (a[0] - start[0]) + (a[1] - start[1]) * (a[1] - start[1]);
+        const distB = (b[0] - start[0]) * (b[0] - start[0]) + (b[1] - start[1]) * (b[1] - start[1]);
+        return distA - distB;
+      });
+      
+      // Create segments between intersections
+      let currentStart = start;
+      for (const inter of edgeInters) {
+        if (isSegmentOutside(currentStart, inter, poly2)) {
+          segments.push({
+            start: currentStart,
+            end: inter,
+            poly: 1
+          });
+        }
+        currentStart = inter;
+      }
+      if (isSegmentOutside(currentStart, end, poly2)) {
+        segments.push({
+          start: currentStart,
+          end: end,
+          poly: 1
+        });
       }
     }
     
-    // Add all vertices from poly2 that are outside poly1
+    // Add segments from poly2
     for (let i = 0; i < poly2.length; i++) {
-      if (!pointInPolygon(poly2[i], poly1)) {
-        result.push(poly2[i]);
+      const start = poly2[i];
+      const end = poly2[(i + 1) % poly2.length];
+      const edgeInters = [];
+      
+      // Find intersections on this edge
+      for (const inter of intersections) {
+        if (inter.edge2 === i) {
+          edgeInters.push(inter.point);
+        }
+      }
+      
+      // Sort intersections along the edge
+      edgeInters.sort((a, b) => {
+        const distA = (a[0] - start[0]) * (a[0] - start[0]) + (a[1] - start[1]) * (a[1] - start[1]);
+        const distB = (b[0] - start[0]) * (b[0] - start[0]) + (b[1] - start[1]) * (b[1] - start[1]);
+        return distA - distB;
+      });
+      
+      // Create segments between intersections
+      let currentStart = start;
+      for (const inter of edgeInters) {
+        if (isSegmentOutside(currentStart, inter, poly1)) {
+          segments.push({
+            start: currentStart,
+            end: inter,
+            poly: 2
+          });
+        }
+        currentStart = inter;
+      }
+      if (isSegmentOutside(currentStart, end, poly1)) {
+        segments.push({
+          start: currentStart,
+          end: end,
+          poly: 2
+        });
       }
     }
     
-    // Add all intersection points
-    for (const inter of intersections) {
-      result.push(inter.point);
+    // Connect segments to form the union boundary
+    if (segments.length === 0) {
+      // Fallback
+      return poly1;
     }
     
-    // Sort points by angle from centroid to create proper polygon
-    if (result.length < 3) {
-      // If we don't have enough points, fall back to convex hull
-      return convexHull([...poly1, ...poly2]);
-    }
+    const result = [];
+    const used = new Array(segments.length).fill(false);
+    const epsilon = 1e-9;
     
-    // Calculate centroid
-    let cx = 0, cy = 0;
-    for (const p of result) {
-      cx += p[0];
-      cy += p[1];
-    }
-    cx /= result.length;
-    cy /= result.length;
+    // Start with the first segment
+    let currentSegment = segments[0];
+    used[0] = true;
+    result.push(currentSegment.start);
+    result.push(currentSegment.end);
     
-    // Sort by angle from centroid
-    result.sort((a, b) => {
-      const angleA = Math.atan2(a[1] - cy, a[0] - cx);
-      const angleB = Math.atan2(b[1] - cy, b[0] - cx);
-      return angleA - angleB;
-    });
+    // Connect segments
+    while (true) {
+      let found = false;
+      const currentEnd = result[result.length - 1];
+      
+      for (let i = 0; i < segments.length; i++) {
+        if (used[i]) continue;
+        
+        // Check if this segment connects to our current end
+        if (pointsEqual(segments[i].start, currentEnd, epsilon)) {
+          result.push(segments[i].end);
+          used[i] = true;
+          found = true;
+          break;
+        }
+      }
+      
+      if (!found) {
+        // Check if we've completed the loop
+        if (result.length > 3 && pointsEqual(result[0], currentEnd, epsilon)) {
+          result.pop(); // Remove duplicate endpoint
+          break;
+        }
+        
+        // Find nearest unused segment
+        let nearestIdx = -1;
+        let nearestDist = Infinity;
+        for (let i = 0; i < segments.length; i++) {
+          if (used[i]) continue;
+          const dist = Math.sqrt(
+            Math.pow(segments[i].start[0] - currentEnd[0], 2) +
+            Math.pow(segments[i].start[1] - currentEnd[1], 2)
+          );
+          if (dist < nearestDist) {
+            nearestDist = dist;
+            nearestIdx = i;
+          }
+        }
+        
+        if (nearestIdx >= 0 && nearestDist < 1) {
+          // Close enough, connect it
+          result.push(segments[nearestIdx].start);
+          result.push(segments[nearestIdx].end);
+          used[nearestIdx] = true;
+        } else {
+          break; // Can't continue
+        }
+      }
+    }
     
     return result;
+  }
+  
+  // Calculate polygon area using shoelace formula
+  function polygonArea(polygon) {
+    let area = 0;
+    for (let i = 0; i < polygon.length; i++) {
+      const j = (i + 1) % polygon.length;
+      area += polygon[i][0] * polygon[j][1];
+      area -= polygon[j][0] * polygon[i][1];
+    }
+    return area / 2;
   }
 
   // Polygon intersection for convex polygons
@@ -338,7 +463,7 @@
       
       switch (operation) {
         case 'union':
-          // Use proper polygon union instead of convex hull
+          // Use proper polygon union algorithm
           resultPoints = polygonUnion(points1, points2);
           break;
           
