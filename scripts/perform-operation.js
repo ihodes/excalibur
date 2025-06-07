@@ -8,16 +8,16 @@
       try {
         console.log('[Boolean Ops] Starting operation:', operation, 'on', elements.length, 'elements');
         
-        // Perform the boolean operation
-        const newElement = window.performExcalidrawBooleanOp(elements, operation);
+        // Perform the boolean operation - now returns array
+        const newElements = window.performExcalidrawBooleanOp(elements, operation);
         
-        console.log('[Boolean Ops] Operation completed, new element:', newElement);
+        console.log('[Boolean Ops] Operation completed, created', newElements.length, 'elements');
         
         // Send result back to content script
         window.postMessage({
           type: 'BOOLEAN_OP_RESULT',
           success: true,
-          element: newElement,
+          elements: newElements,  // Changed from element to elements
           operation: operation,
           originalIds: validIds
         }, '*');

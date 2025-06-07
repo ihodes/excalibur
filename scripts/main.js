@@ -384,12 +384,12 @@ function handleBooleanOpResult(data) {
     return;
   }
   
-  const { element, operation, originalIds } = data;
+  const { elements, operation, originalIds } = data;
   
   // Send message to update Excalidraw
   window.postMessage({
     type: 'UPDATE_EXCALIDRAW_ELEMENTS',
-    newElement: element,
+    newElements: elements,  // Changed from newElement to newElements
     originalIds: originalIds
   }, '*');
 }
