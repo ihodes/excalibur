@@ -19,7 +19,7 @@ function waitForExcalidraw() {
 function initializeBooleanOperations() {
   // Load boolean operations implementation
   const boolOpsScript = document.createElement('script');
-  boolOpsScript.src = chrome.runtime.getURL('scripts/diff-diff-exact.js');
+  boolOpsScript.src = chrome.runtime.getURL('scripts/boolean-operations.js');
   boolOpsScript.onload = function() {
     console.log('[Extension] Boolean operations loaded');
     initializeBooleanOperationsCore();

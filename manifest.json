@@ -14,7 +14,7 @@
   "content_scripts": [
     {
       "matches": ["https://excalidraw.com/*", "https://app.excalidraw.com/*", "http://localhost/*"],
-      "js": ["scripts/content-production.js"],
+      "js": ["scripts/main.js"],
       "css": ["styles/content.css"],
       "run_at": "document_idle"
     }
@@ -26,7 +26,7 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["scripts/state-monitor.js", "scripts/debug-state.js", "scripts/diff-diff-exact.js", "scripts/perform-operation.js", "scripts/update-excalidraw.js", "scripts/debug-helper.js"],
+      "resources": ["scripts/state-monitor.js", "scripts/debug-state.js", "scripts/boolean-operations.js", "scripts/perform-operation.js", "scripts/update-excalidraw.js", "scripts/debug-helper.js"],
       "matches": ["https://excalidraw.com/*", "https://app.excalidraw.com/*", "http://localhost/*"]
     }
   ]
