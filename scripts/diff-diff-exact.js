@@ -1132,7 +1132,7 @@ function performExcalidrawBooleanOpDiffDiff(elements, operation) {
 };
 
   // Expose to window
-  window.performExcalidrawBooleanOpDiffDiff = performExcalidrawBooleanOpDiffDiff;
-  console.log('[DiffDiff] Function defined:', typeof window.performExcalidrawBooleanOpDiffDiff);
-  console.log('[DiffDiff] Attached to window:', window.performExcalidrawBooleanOpDiffDiff === performExcalidrawBooleanOpDiffDiff);
+  window.performExcalidrawBooleanOp = performExcalidrawBooleanOpDiffDiff;
+  console.log('[DiffDiff] Function defined:', typeof window.performExcalidrawBooleanOp);
+  console.log('[DiffDiff] Attached to window:', window.performExcalidrawBooleanOp === performExcalidrawBooleanOpDiffDiff);
 })();

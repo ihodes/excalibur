@@ -7,15 +7,6 @@
       
       try {
         console.log('[Boolean Ops] Starting operation:', operation, 'on', elements.length, 'elements');
-        console.log('[Perform] Using function:', window.performExcalidrawBooleanOp.name || 'anonymous');
-        console.log('[Perform] Function toString:', window.performExcalidrawBooleanOp.toString().substring(0, 100));
-        
-        // Check which implementation we're using
-        if (window.performExcalidrawBooleanOp.toString().includes('[DiffDiff]')) {
-          console.log('[Perform] Using DiffDiff implementation');
-        } else if (window.performExcalidrawBooleanOp.toString().includes('[Boolean Ops]')) {
-          console.log('[Perform] Using simple-boolean-ops implementation');
-        }
         
         // Perform the boolean operation
         const newElement = window.performExcalidrawBooleanOp(elements, operation);

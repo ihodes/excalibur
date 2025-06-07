@@ -17,30 +17,12 @@ function waitForExcalidraw() {
 }
 
 function initializeBooleanOperations() {
-  // Load simple boolean operations (working version)
+  // Load boolean operations implementation
   const boolOpsScript = document.createElement('script');
-  boolOpsScript.src = chrome.runtime.getURL('scripts/simple-boolean-ops.js');
+  boolOpsScript.src = chrome.runtime.getURL('scripts/diff-diff-exact.js');
   boolOpsScript.onload = function() {
-    // Load diff-diff exact implementation
-    const diffDiffScript = document.createElement('script');
-    diffDiffScript.src = chrome.runtime.getURL('scripts/diff-diff-exact.js');
-    diffDiffScript.onload = function() {
-      // Give it a moment to ensure the script fully executes
-      setTimeout(() => {
-        // Override with diff-diff exact implementation by loading the override script
-        const overrideScript = document.createElement('script');
-        overrideScript.src = chrome.runtime.getURL('scripts/override-boolean-ops.js');
-        overrideScript.onload = function() {
-          console.log('[Extension] Override script loaded');
-          initializeBooleanOperationsCore();
-        };
-        overrideScript.onerror = function() {
-          console.error('[Extension] Failed to load override script');
-        };
-        document.head.appendChild(overrideScript);
-      }, 50);
-    };
-    document.head.appendChild(diffDiffScript);
+    console.log('[Extension] Boolean operations loaded');
+    initializeBooleanOperationsCore();
   };
   boolOpsScript.onerror = function() {
     console.error('[Boolean Ops] Failed to load boolean operations');
