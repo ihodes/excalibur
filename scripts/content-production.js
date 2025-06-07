@@ -21,15 +21,26 @@ function initializeBooleanOperations() {
   const boolOpsScript = document.createElement('script');
   boolOpsScript.src = chrome.runtime.getURL('scripts/simple-boolean-ops.js');
   boolOpsScript.onload = function() {
-    // Load exact implementation
-    const exactScript = document.createElement('script');
-    exactScript.src = chrome.runtime.getURL('scripts/boolean-ops-exact.js');
-    exactScript.onload = function() {
-      // Override with exact implementation
-      window.performExcalidrawBooleanOp = window.performExcalidrawBooleanOpExact;
-      initializeBooleanOperationsCore();
+    // Load diff-diff exact implementation
+    const diffDiffScript = document.createElement('script');
+    diffDiffScript.src = chrome.runtime.getURL('scripts/diff-diff-exact.js');
+    diffDiffScript.onload = function() {
+      // Give it a moment to ensure the script fully executes
+      setTimeout(() => {
+        // Override with diff-diff exact implementation by loading the override script
+        const overrideScript = document.createElement('script');
+        overrideScript.src = chrome.runtime.getURL('scripts/override-boolean-ops.js');
+        overrideScript.onload = function() {
+          console.log('[Extension] Override script loaded');
+          initializeBooleanOperationsCore();
+        };
+        overrideScript.onerror = function() {
+          console.error('[Extension] Failed to load override script');
+        };
+        document.head.appendChild(overrideScript);
+      }, 50);
     };
-    document.head.appendChild(exactScript);
+    document.head.appendChild(diffDiffScript);
   };
   boolOpsScript.onerror = function() {
     console.error('[Boolean Ops] Failed to load boolean operations');
@@ -42,15 +53,18 @@ function initializeBooleanOperationsCore() {
   // Inject state monitor
   injectStateMonitor();
   
-  // Inject perform operation handler
-  const performScript = document.createElement('script');
-  performScript.src = chrome.runtime.getURL('scripts/perform-operation.js');
-  document.head.appendChild(performScript);
-  
-  // Inject update handler
-  const updateScript = document.createElement('script');
-  updateScript.src = chrome.runtime.getURL('scripts/update-excalidraw.js');
-  document.head.appendChild(updateScript);
+  // Wait a bit to ensure override is complete, then inject other scripts
+  setTimeout(() => {
+    // Inject perform operation handler
+    const performScript = document.createElement('script');
+    performScript.src = chrome.runtime.getURL('scripts/perform-operation.js');
+    document.head.appendChild(performScript);
+    
+    // Inject update handler
+    const updateScript = document.createElement('script');
+    updateScript.src = chrome.runtime.getURL('scripts/update-excalidraw.js');
+    document.head.appendChild(updateScript);
+  }, 100);
   
   // Create validation feedback
   const validationFeedback = document.createElement('div');
