@@ -347,6 +347,225 @@
     });
   }
 
+  // Find closest points between two polygons
+  function findClosestPoints(poly1, poly2) {
+    let minDist = Infinity;
+    let closestPair = null;
+    
+    for (let i = 0; i < poly1.length; i++) {
+      for (let j = 0; j < poly2.length; j++) {
+        const dist = Math.sqrt(
+          (poly1[i][0] - poly2[j][0]) ** 2 + 
+          (poly1[i][1] - poly2[j][1]) ** 2
+        );
+        if (dist < minDist) {
+          minDist = dist;
+          closestPair = { p1: i, p2: j, dist: minDist };
+        }
+      }
+    }
+    
+    return closestPair;
+  }
+
+  // Polygon difference (poly1 - poly2)
+  function polygonDifference(poly1, poly2) {
+    const intersections = findPolygonIntersections(poly1, poly2);
+    
+    console.log('[BooleanOps] Difference - found', intersections.length, 'intersections');
+    
+    // Check if poly2 is completely inside poly1
+    const poly2Inside = poly2.every(p => pointInPolygon(p, poly1));
+    const poly1Inside = poly1.every(p => pointInPolygon(p, poly2));
+    
+    if (poly1Inside) {
+      // poly1 is inside poly2, difference is empty
+      return [];
+    }
+    
+    if (poly2Inside && intersections.length === 0) {
+      // poly2 is completely inside poly1 - create a hole
+      console.log('[BooleanOps] Creating hole - poly2 is inside poly1');
+      
+      // Find the closest points between the two polygons
+      const closest = findClosestPoints(poly1, poly2);
+      if (!closest) return poly1;
+      
+      const resultPoints = [];
+      
+      // Trace poly1 up to the cut point
+      for (let i = 0; i <= closest.p1; i++) {
+        resultPoints.push([...poly1[i]]);
+      }
+      
+      // Move directly to the closest point on poly2 (zero-width cut)
+      const bridge1 = [...poly2[closest.p2]];
+      resultPoints.push(bridge1);
+      
+      // Trace poly2 in reverse order (to create the hole)
+      for (let i = 1; i <= poly2.length; i++) {
+        const idx = (closest.p2 - i + poly2.length) % poly2.length;
+        resultPoints.push([...poly2[idx]]);
+      }
+      
+      // Return to the cut point on poly1 (completing the zero-width bridge)
+      const bridge2 = [...poly1[closest.p1]];
+      resultPoints.push(bridge2);
+      
+      // Continue tracing poly1 from where we left off
+      for (let i = closest.p1 + 1; i < poly1.length; i++) {
+        resultPoints.push([...poly1[i]]);
+      }
+      
+      console.log('[BooleanOps] Created hole with', resultPoints.length, 'points');
+      return resultPoints;
+    }
+    
+    // Standard difference with intersections
+    const resultSegments = [];
+    
+    // Process each edge of poly1
+    for (let i = 0; i < poly1.length; i++) {
+      const start = poly1[i];
+      const end = poly1[(i + 1) % poly1.length];
+      
+      // Find all intersections on this edge
+      const edgeIntersections = intersections
+        .filter(inter => inter.edge1 === i)
+        .map(inter => inter.point)
+        .sort((a, b) => {
+          // Sort by distance from start
+          const distA = (a[0] - start[0]) ** 2 + (a[1] - start[1]) ** 2;
+          const distB = (b[0] - start[0]) ** 2 + (b[1] - start[1]) ** 2;
+          return distA - distB;
+        });
+      
+      // Add start point and intersections
+      const edgePoints = [start, ...edgeIntersections, end];
+      
+      // Check each segment
+      for (let j = 0; j < edgePoints.length - 1; j++) {
+        const segStart = edgePoints[j];
+        const segEnd = edgePoints[j + 1];
+        const midpoint = [
+          (segStart[0] + segEnd[0]) / 2,
+          (segStart[1] + segEnd[1]) / 2
+        ];
+        
+        // Keep segment if midpoint is outside poly2
+        if (!pointInPolygon(midpoint, poly2)) {
+          resultSegments.push({ start: segStart, end: segEnd });
+        }
+      }
+    }
+    
+    // Process edges from poly2 that are inside poly1
+    for (let i = 0; i < poly2.length; i++) {
+      const start = poly2[i];
+      const end = poly2[(i + 1) % poly2.length];
+      
+      // Find all intersections on this edge
+      const edgeIntersections = intersections
+        .filter(inter => inter.edge2 === i)
+        .map(inter => inter.point)
+        .sort((a, b) => {
+          // Sort by distance from start
+          const distA = (a[0] - start[0]) ** 2 + (a[1] - start[1]) ** 2;
+          const distB = (b[0] - start[0]) ** 2 + (b[1] - start[1]) ** 2;
+          return distA - distB;
+        });
+      
+      // Add start point and intersections
+      const edgePoints = [start, ...edgeIntersections, end];
+      
+      // Check each segment (in reverse for difference)
+      for (let j = edgePoints.length - 2; j >= 0; j--) {
+        const segStart = edgePoints[j + 1];
+        const segEnd = edgePoints[j];
+        const midpoint = [
+          (segStart[0] + segEnd[0]) / 2,
+          (segStart[1] + segEnd[1]) / 2
+        ];
+        
+        // Keep segment if midpoint is inside poly1
+        if (pointInPolygon(midpoint, poly1)) {
+          resultSegments.push({ start: segStart, end: segEnd });
+        }
+      }
+    }
+    
+    console.log('[BooleanOps] Difference - result segments:', resultSegments.length);
+    
+    // Connect segments into a polygon
+    if (resultSegments.length === 0) {
+      // No intersections and poly2 not inside poly1 - return poly1
+      return poly1;
+    }
+    
+    const resultPoints = [];
+    const used = new Array(resultSegments.length).fill(false);
+    
+    // Start with first segment
+    let currentSegment = resultSegments[0];
+    used[0] = true;
+    resultPoints.push(currentSegment.start);
+    resultPoints.push(currentSegment.end);
+    
+    // Connect segments
+    while (true) {
+      const currentEnd = resultPoints[resultPoints.length - 1];
+      let found = false;
+      
+      for (let i = 0; i < resultSegments.length; i++) {
+        if (used[i]) continue;
+        
+        if (pointsEqual(resultSegments[i].start, currentEnd)) {
+          resultPoints.push(resultSegments[i].end);
+          used[i] = true;
+          found = true;
+          break;
+        }
+      }
+      
+      if (!found) {
+        // Check if we've closed the polygon
+        if (resultPoints.length > 2 && pointsEqual(resultPoints[0], currentEnd)) {
+          resultPoints.pop(); // Remove duplicate
+          break;
+        }
+        
+        // Find nearest unused segment
+        let nearestIdx = -1;
+        let nearestDist = Infinity;
+        
+        for (let i = 0; i < resultSegments.length; i++) {
+          if (used[i]) continue;
+          
+          const dist = Math.sqrt(
+            (resultSegments[i].start[0] - currentEnd[0]) ** 2 +
+            (resultSegments[i].start[1] - currentEnd[1]) ** 2
+          );
+          
+          if (dist < nearestDist) {
+            nearestDist = dist;
+            nearestIdx = i;
+          }
+        }
+        
+        if (nearestIdx >= 0 && nearestDist < 1) {
+          resultPoints.push(resultSegments[nearestIdx].start);
+          resultPoints.push(resultSegments[nearestIdx].end);
+          used[nearestIdx] = true;
+        } else {
+          break;
+        }
+      }
+    }
+    
+    console.log('[BooleanOps] Difference - final points:', resultPoints.length);
+    return resultPoints;
+  }
+
   // Simple polygon intersection
   function polygonIntersection(poly1, poly2) {
     const resultPoints = [];
@@ -469,24 +688,8 @@
           break;
           
         case 'difference':
-          // For difference, we need points from points1 that are not in points2
-          resultPoints = points1.filter(p => !pointInPolygon(p, points2));
-          
-          // Find intersection edges and add them
-          for (let i = 0; i < points1.length; i++) {
-            const a = points1[i];
-            const b = points1[(i + 1) % points1.length];
-            
-            for (let j = 0; j < points2.length; j++) {
-              const c = points2[j];
-              const d = points2[(j + 1) % points2.length];
-              
-              const intersection = lineIntersection(a, b, c, d);
-              if (intersection) {
-                resultPoints.push(intersection);
-              }
-            }
-          }
+          // Use polygon difference algorithm
+          resultPoints = polygonDifference(points1, points2);
           break;
           
         case 'exclusion':
