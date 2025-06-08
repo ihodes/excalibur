@@ -154,20 +154,15 @@ function initializeBooleanOperationsCore() {
       // Update validation feedback
       updateValidationFeedback(validationFeedback, validationInfo);
       
-      // Update toolbar visibility and state
-      if (validationInfo && validationInfo.selectedCount >= 2) {
+      // Update toolbar visibility - only show when valid
+      if (validationInfo && validationInfo.isValid) {
         toolbar.style.display = 'block';
         toolbar.classList.add('show');
         
-        // Enable/disable buttons based on validation
+        // Enable all buttons
         toolbar.querySelectorAll('.boolean-op-btn').forEach(btn => {
-          if (validationInfo.isValid) {
-            btn.removeAttribute('disabled');
-            btn.classList.remove('disabled');
-          } else {
-            btn.setAttribute('disabled', 'true');
-            btn.classList.add('disabled');
-          }
+          btn.removeAttribute('disabled');
+          btn.classList.remove('disabled');
         });
       } else {
         toolbar.classList.remove('show');
@@ -176,14 +171,13 @@ function initializeBooleanOperationsCore() {
             toolbar.style.display = 'none';
           }
         }, 200);
-        validationFeedback.style.display = 'none';
       }
     } else if (event.data.type === 'DEBUG_STATE_RESULTS') {
       // Debug state results received
     } else if (event.data.type === 'BOOLEAN_OP_RESULT') {
       handleBooleanOpResult(event.data);
     } else if (event.data.type === 'EXCALIDRAW_UPDATE_SUCCESS') {
-      showToast('Boolean operation completed', 'success');
+      // Toast disabled - operation completed successfully
     } else if (event.data.type === 'EXCALIDRAW_UPDATE_FAILED') {
       console.error('[Boolean Ops] Update failed:', event.data.error);
       showToast('Failed to update canvas', 'error');
@@ -243,6 +237,7 @@ function validateSelectedShapes(elements, selectedIds) {
     const shapeInfo = {
       id: element.id,
       type: element.type,
+      element: element,
       isValid: false,
       reason: ''
     };
@@ -282,6 +277,16 @@ function validateSelectedShapes(elements, selectedIds) {
   // Set validation status
   validation.isValid = validation.validShapes.length >= 2;
   
+  // Check if shapes overlap (required for boolean operations)
+  if (validation.isValid) {
+    const shapesOverlap = checkShapesOverlap(validation.validShapes.map(s => s.element));
+    if (!shapesOverlap) {
+      validation.isValid = false;
+      validation.message = 'Shapes must overlap for boolean operations';
+      return validation;
+    }
+  }
+  
   // Generate message
   if (validation.isValid) {
     const typeCounts = {};
@@ -304,18 +309,60 @@ function validateSelectedShapes(elements, selectedIds) {
   return validation;
 }
 
-function updateValidationFeedback(feedbackElement, validation) {
-  if (!validation || validation.selectedCount === 0) {
-    feedbackElement.style.display = 'none';
-    return;
+// Check if shapes' bounding boxes overlap
+function checkShapesOverlap(shapes) {
+  if (shapes.length < 2) return false;
+  
+  // Get bounding box for each shape
+  const getBounds = (shape) => {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    
+    if (shape.type === 'line' && shape.points) {
+      // For polygons
+      shape.points.forEach(point => {
+        const x = shape.x + point[0];
+        const y = shape.y + point[1];
+        minX = Math.min(minX, x);
+        minY = Math.min(minY, y);
+        maxX = Math.max(maxX, x);
+        maxY = Math.max(maxY, y);
+      });
+    } else if (['rectangle', 'ellipse', 'diamond'].includes(shape.type)) {
+      // For regular shapes
+      minX = shape.x;
+      minY = shape.y;
+      maxX = shape.x + shape.width;
+      maxY = shape.y + shape.height;
+    }
+    
+    return { minX, minY, maxX, maxY };
+  };
+  
+  // Check if any pair of shapes overlaps
+  for (let i = 0; i < shapes.length - 1; i++) {
+    for (let j = i + 1; j < shapes.length; j++) {
+      const bounds1 = getBounds(shapes[i]);
+      const bounds2 = getBounds(shapes[j]);
+      
+      // Check for bounding box overlap
+      const overlapX = bounds1.maxX > bounds2.minX && bounds2.maxX > bounds1.minX;
+      const overlapY = bounds1.maxY > bounds2.minY && bounds2.maxY > bounds1.minY;
+      
+      if (overlapX && overlapY) {
+        return true; // At least one pair overlaps
+      }
+    }
   }
   
-  if (validation.selectedCount >= 2) {
-    feedbackElement.style.display = 'block';
-    feedbackElement.className = `boolean-ops-validation ${validation.isValid ? 'valid' : 'invalid'}`;
-    feedbackElement.textContent = validation.message;
-  } else {
-    feedbackElement.style.display = 'none';
+  return false; // No overlapping shapes found
+}
+
+function updateValidationFeedback(feedbackElement, validation) {
+  // Hide validation feedback UI - log to console instead
+  feedbackElement.style.display = 'none';
+  
+  if (validation && validation.message) {
+    console.log('[Boolean Ops Validation]', validation.message, validation.isValid ? '✓' : '✗');
   }
 }
 
