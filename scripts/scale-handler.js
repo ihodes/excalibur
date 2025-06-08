@@ -1,9 +1,12 @@
-// Simple scale handler for 2-point lines
+// Scale handler integrated with sidebar
 (function() {
   let scaleReference = null; // {elementId, pixelLength}
   let currentTooltip = null;
   let dimensionBox = null;
   let currentElement = null;
+  let scaleUIInjected = false;
+  let currentSelectedElements = [];
+  let sidebarObserver = null;
 
   // Calculate line/arrow length
   function getLineLength(element) {
@@ -12,10 +15,16 @@
     }
 
     if (element.type === 'line' || element.type === 'arrow') {
-      const [p1, p2] = element.points;
-      const dx = p2[0] - p1[0];
-      const dy = p2[1] - p1[1];
-      return Math.sqrt(dx * dx + dy * dy);
+      // Calculate total length for multi-point lines
+      let totalLength = 0;
+      for (let i = 1; i < element.points.length; i++) {
+        const p1 = element.points[i - 1];
+        const p2 = element.points[i];
+        const dx = p2[0] - p1[0];
+        const dy = p2[1] - p1[1];
+        totalLength += Math.sqrt(dx * dx + dy * dy);
+      }
+      return totalLength;
     }
     
     return null;
@@ -92,13 +101,14 @@
         const targetPixels = targetDimensions.length * pixelsPerMm;
         const scaleFactor = targetPixels / currentLength;
         
-        newElement.points = [
-          element.points[0],
-          [
-            element.points[0][0] + (element.points[1][0] - element.points[0][0]) * scaleFactor,
-            element.points[0][1] + (element.points[1][1] - element.points[0][1]) * scaleFactor
-          ]
-        ];
+        // Scale all points relative to the first point
+        newElement.points = element.points.map((point, index) => {
+          if (index === 0) return point; // Keep first point fixed
+          return [
+            element.points[0][0] + (point[0] - element.points[0][0]) * scaleFactor,
+            element.points[0][1] + (point[1] - element.points[0][1]) * scaleFactor
+          ];
+        });
         break;
         
       case 'rectangle':
@@ -167,53 +177,239 @@
     console.log('[Scale]', message);
   }
 
-  // Create or update dimension box
-  function updateDimensionBox(element) {
-    if (!dimensionBox) {
-      dimensionBox = document.createElement('div');
-      dimensionBox.style.cssText = `
-        position: fixed;
-        bottom: 20px;
-        right: 20px;
-        background: white;
-        border: 2px solid #6965DB;
-        border-radius: 8px;
-        padding: 12px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-        z-index: 100001;
-        font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-        min-width: 200px;
-      `;
-      document.body.appendChild(dimensionBox);
+  // Set up MutationObserver to watch for scale container removal
+  function setupSidebarObserver() {
+    if (sidebarObserver) {
+      sidebarObserver.disconnect();
     }
+    
+    const sidebar = document.querySelector('.App-menu__left');
+    if (!sidebar) return;
+    
+    sidebarObserver = new MutationObserver((mutations) => {
+      // Check if our scale container was removed
+      const scaleContainer = document.getElementById('excalidraw-scale-ext');
+      if (!scaleContainer && scaleUIInjected && currentSelectedElements.length > 0) {
+        console.log('[Scale] Container was removed, re-injecting...');
+        scaleUIInjected = false;
+        
+        // Re-inject if we have scalable elements selected
+        const scalableElements = currentSelectedElements.filter(el => getElementDimensions(el) !== null);
+        if (scalableElements.length > 0) {
+          injectScaleUIIntoSidebar(scalableElements);
+        }
+      }
+    });
+    
+    // Observe the sidebar for child list changes
+    sidebarObserver.observe(sidebar, {
+      childList: true,
+      subtree: true
+    });
+  }
 
+  // Function to inject scale UI into sidebar
+  function injectScaleUIIntoSidebar(selectedElements) {
+    const checkAndInject = () => {
+      const sidebar = document.querySelector('.App-menu__left');
+      if (!sidebar) {
+        console.log('[Scale] Sidebar not found, retrying...');
+        setTimeout(checkAndInject, 500);
+        return;
+      }
+      
+      // Check if already injected
+      const existing = document.getElementById('excalidraw-scale-ext');
+      if (existing) {
+        console.log('[Scale] Already injected, updating visibility and content');
+        existing.style.display = 'block';
+        existing.style.opacity = '1';
+        updateScaleUI(selectedElements);
+        return;
+      }
+      
+      // Find the selected shape actions DIV (not the section)
+      const selectedShapeActions = document.querySelector('div.selected-shape-actions');
+      
+      if (!selectedShapeActions) {
+        console.log('[Scale] Could not find selected-shape-actions div, retrying...');
+        setTimeout(checkAndInject, 500);
+        return;
+      }
+      
+      // The target container is the selected-shape-actions div
+      const targetContainer = selectedShapeActions;
+      
+      // Create scale container as fieldset
+      const scaleContainer = document.createElement('fieldset');
+      scaleContainer.className = 'scale-ui-container';
+      scaleContainer.id = 'excalidraw-scale-ext';
+      scaleContainer.style.display = 'block';
+      scaleContainer.style.opacity = '0';
+      scaleContainer.style.transition = 'opacity 0.2s ease-in-out';
+      
+      // Add legend
+      const legend = document.createElement('legend');
+      legend.textContent = 'Scale';
+      scaleContainer.appendChild(legend);
+      
+      // Create content div
+      const contentDiv = document.createElement('div');
+      contentDiv.id = 'scale-ui-content';
+      scaleContainer.appendChild(contentDiv);
+      
+      // Append to the target container
+      targetContainer.appendChild(scaleContainer);
+      
+      scaleUIInjected = true;
+      console.log('[Scale] Successfully injected into sidebar');
+      console.log('[Scale] Scale container parent:', scaleContainer.parentElement);
+      console.log('[Scale] Scale container parent class:', scaleContainer.parentElement?.className);
+      console.log('[Scale] Children of selected-shape-actions after injection:', selectedShapeActions.children.length);
+      console.log('[Scale] Last child of selected-shape-actions:', selectedShapeActions.lastElementChild);
+      
+      // Fade in the container
+      requestAnimationFrame(() => {
+        scaleContainer.style.opacity = '1';
+      });
+      
+      updateScaleUI(selectedElements);
+      
+      // Set up observer to watch for removal - delay to ensure DOM is stable
+      setTimeout(() => {
+        setupSidebarObserver();
+      }, 100);
+    };
+    
+    checkAndInject();
+  }
+  
+  // Set up mutation observer to watch for sidebar changes
+  function setupSidebarObserver() {
+    if (sidebarObserver) {
+      sidebarObserver.disconnect();
+    }
+    
+    // Watch the selected-shape-actions DIV specifically
+    const selectedShapeActions = document.querySelector('div.selected-shape-actions');
+    if (!selectedShapeActions) {
+      // If not found, watch the sidebar
+      const sidebar = document.querySelector('.App-menu__left');
+      if (!sidebar) return;
+      
+      sidebarObserver = new MutationObserver((mutations) => {
+        // Check if our container was removed
+        const container = document.getElementById('excalidraw-scale-ext');
+        if (!container && scaleUIInjected && currentSelectedElements.length > 0) {
+          console.log('[Scale] Container was removed, re-injecting...');
+          scaleUIInjected = false;
+          const scalableElements = currentSelectedElements.filter(el => getElementDimensions(el) !== null);
+          if (scalableElements.length > 0) {
+            injectScaleUIIntoSidebar(scalableElements);
+          }
+        }
+      });
+      
+      sidebarObserver.observe(sidebar, {
+        childList: true,
+        subtree: true
+      });
+    } else {
+      // Watch the selected-shape-actions directly
+      sidebarObserver = new MutationObserver((mutations) => {
+        // Check if our container was removed
+        const container = document.getElementById('excalidraw-scale-ext');
+        if (!container && scaleUIInjected && currentSelectedElements.length > 0) {
+          console.log('[Scale] Container was removed from selected-shape-actions, re-injecting...');
+          scaleUIInjected = false;
+          const scalableElements = currentSelectedElements.filter(el => getElementDimensions(el) !== null);
+          if (scalableElements.length > 0) {
+            // Small delay to let React finish its updates
+            setTimeout(() => {
+              injectScaleUIIntoSidebar(scalableElements);
+            }, 50);
+          }
+        }
+      });
+      
+      sidebarObserver.observe(selectedShapeActions, {
+        childList: true,
+        subtree: false
+      });
+    }
+  }
+  
+  // Update scale UI content
+  function updateScaleUI(selectedElements) {
+    const contentDiv = document.getElementById('scale-ui-content');
+    if (!contentDiv) return;
+    
+    if (!selectedElements || selectedElements.length === 0) {
+      contentDiv.innerHTML = '';
+      return;
+    }
+    
+    if (selectedElements.length === 1) {
+      const element = selectedElements[0];
+      updateSingleElementUI(contentDiv, element);
+    } else {
+      // Multiple elements selected - show scale buttons
+      updateMultiElementUI(contentDiv, selectedElements);
+    }
+  }
+  
+  // Create or update dimension box (keeping for backwards compatibility)
+  function updateDimensionBox(element) {
+    // Redirect to sidebar UI
+    if (!scaleUIInjected) {
+      injectScaleUIIntoSidebar([element]);
+    } else {
+      updateScaleUI([element]);
+    }
+  }
+
+  // Update UI for single element
+  function updateSingleElementUI(contentDiv, element) {
+    // Clear existing content
+    contentDiv.innerHTML = '';
+    
     const dims = getElementDimensions(element);
     if (!dims) {
-      hideDimensionBox();
       return;
     }
 
-    // Check if this can be a reference (only 2-point lines/arrows)
+    // Check if this can be a reference (lines and arrows with valid length)
     const canBeReference = (element.type === 'line' || element.type === 'arrow') && 
-                          element.points && element.points.length === 2;
+                          dims && dims.type === 'linear' && dims.length > 0;
 
     if (!scaleReference && canBeReference) {
-      // Show UI to set as reference
-      dimensionBox.innerHTML = `
-        <div style="margin-bottom: 8px; font-size: 14px; color: #333;">Set as scale reference:</div>
-        <button id="setReference" style="
-          background: #6965DB;
-          color: white;
-          border: none;
-          padding: 8px 16px;
-          border-radius: 6px;
-          cursor: pointer;
-          font-size: 14px;
-          width: 100%;
-        ">Set as 100mm reference</button>
+      // Show UI to set as reference with ruler icon
+      const buttonRow = document.createElement('div');
+      buttonRow.className = 'buttonList';
+      
+      const button = document.createElement('button');
+      button.className = 'ToolIcon_type_button ToolIcon_size_medium ToolIcon';
+      button.title = 'Set as 100mm reference';
+      button.type = 'button';
+      button.setAttribute('aria-label', 'Set as 100mm reference');
+      
+      // Create inner icon wrapper with ruler SVG
+      const iconWrapper = document.createElement('div');
+      iconWrapper.className = 'ToolIcon__icon';
+      iconWrapper.setAttribute('aria-hidden', 'true');
+      iconWrapper.innerHTML = `
+        <svg aria-hidden="true" focusable="false" role="img" viewBox="0 0 24 24" class="" fill="currentColor">
+          <path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zm0-10v2h14V7H7z"/>
+        </svg>
       `;
+      
+      button.appendChild(iconWrapper);
+      buttonRow.appendChild(button);
+      
+      contentDiv.innerHTML = '';
+      contentDiv.appendChild(buttonRow);
 
-      dimensionBox.querySelector('#setReference').addEventListener('click', () => {
+      button.addEventListener('click', () => {
         if (dims.length) {
           scaleReference = {
             elementId: element.id,
@@ -221,14 +417,15 @@
             mmLength: 100
           };
           console.log('[Scale] Set reference:', element.id, 'as 100mm');
-          updateDimensionBox(element); // Update to show dimension input
+          // Immediately update UI to show controls
+          updateSingleElementUI(contentDiv, element);
         }
       });
     } else if (!scaleReference) {
       // No reference set and can't use this element as reference
-      dimensionBox.innerHTML = `
-        <div style="font-size: 14px; color: #666; text-align: center;">
-          Select a 2-point line<br>to set scale reference
+      contentDiv.innerHTML = `
+        <div style="font-size: 14px; color: var(--color-text-secondary); text-align: center;">
+          Select a line or arrow<br>to set scale reference
         </div>
       `;
     } else {
@@ -238,37 +435,60 @@
       if (dims.type === 'linear') {
         // Single dimension (lines, arrows)
         const mm = dims.length / pixelsPerMm;
-        dimensionBox.innerHTML = `
-          <div style="display: flex; gap: 8px; align-items: center;">
-            <input id="lengthInput" type="number" value="${mm.toFixed(1)}" step="0.1" style="
-              width: 80px;
-              padding: 6px;
-              border: 1px solid #ddd;
-              border-radius: 4px;
-              font-size: 14px;
-            ">
-            <span style="font-size: 14px; color: #666;">mm</span>
-            <button id="applyDimension" style="
-              background: #6965DB;
-              color: white;
-              border: none;
-              padding: 6px 12px;
-              border-radius: 4px;
-              cursor: pointer;
-              font-size: 14px;
-            ">Apply</button>
-          </div>
+        
+        // Create dimension input row
+        const inputRow = document.createElement('div');
+        inputRow.style.cssText = 'display: flex; gap: 8px; align-items: center; margin-bottom: 8px;';
+        inputRow.innerHTML = `
+          <input id="lengthInput" type="number" value="${mm.toFixed(1)}" step="0.1" style="
+            width: 80px;
+            padding: 6px;
+            border: 1px solid var(--color-border);
+            border-radius: 4px;
+            font-size: 14px;
+            background: var(--color-bg-secondary);
+            color: var(--color-text);
+          ">
+          <span style="font-size: 14px;">mm</span>
         `;
         
-        const input = dimensionBox.querySelector('#lengthInput');
-        const applyBtn = dimensionBox.querySelector('#applyDimension');
+        contentDiv.appendChild(inputRow);
         
-        applyBtn.addEventListener('click', () => {
-          const targetMm = parseFloat(input.value);
-          if (targetMm > 0) {
-            scaleElement(element, { length: targetMm });
-          }
+        // Create scale buttons row
+        const buttonRow = document.createElement('div');
+        buttonRow.className = 'buttonList';
+        
+        const scaleOperations = [
+          { scale: 0.5, title: 'Halve size (Alt+H)', icon: '½' },
+          { scale: 0.9, title: 'Scale down (Alt+↓)', icon: '↓' },
+          { scale: 1.1, title: 'Scale up (Alt+↑)', icon: '↑' },
+          { scale: 2.0, title: 'Double size (Alt+D)', icon: '2×' }
+        ];
+        
+        scaleOperations.forEach(({ scale, title, icon }) => {
+          const button = document.createElement('button');
+          button.className = 'ToolIcon_type_button ToolIcon_size_medium ToolIcon';
+          button.title = title;
+          button.type = 'button';
+          button.setAttribute('aria-label', title);
+          
+          const iconWrapper = document.createElement('div');
+          iconWrapper.className = 'ToolIcon__icon';
+          iconWrapper.setAttribute('aria-hidden', 'true');
+          iconWrapper.innerHTML = `<span style="font-size: 16px; font-weight: bold;">${icon}</span>`;
+          
+          button.appendChild(iconWrapper);
+          
+          button.addEventListener('click', () => {
+            scaleElements([element], scale);
+          });
+          
+          buttonRow.appendChild(button);
         });
+        
+        contentDiv.appendChild(buttonRow);
+        
+        const input = inputRow.querySelector('#lengthInput');
         
         input.addEventListener('keydown', (e) => {
           if (e.key === 'Enter') {
@@ -286,38 +506,60 @@
         const isCircle = Math.abs(dims.width - dims.height) < 1;
         
         if (isCircle) {
-          dimensionBox.innerHTML = `
-            <div style="display: flex; gap: 8px; align-items: center;">
-              <span style="font-size: 14px; color: #666;">⌀</span>
-              <input id="diameterInput" type="number" value="${widthMm.toFixed(1)}" step="0.1" style="
-                width: 80px;
-                padding: 6px;
-                border: 1px solid #ddd;
-                border-radius: 4px;
-                font-size: 14px;
-              ">
-              <span style="font-size: 14px; color: #666;">mm</span>
-              <button id="applyDimension" style="
-                background: #6965DB;
-                color: white;
-                border: none;
-                padding: 6px 12px;
-                border-radius: 4px;
-                cursor: pointer;
-                font-size: 14px;
-              ">Apply</button>
-            </div>
+          // Create dimension input row
+          const inputRow = document.createElement('div');
+          inputRow.style.cssText = 'display: flex; gap: 8px; align-items: center; margin-bottom: 8px;';
+          inputRow.innerHTML = `
+            <span style="font-size: 14px;">⌀</span>
+            <input id="diameterInput" type="number" value="${widthMm.toFixed(1)}" step="0.1" style="
+              width: 80px;
+              padding: 6px;
+              border: 1px solid var(--color-border);
+              border-radius: 4px;
+              font-size: 14px;
+              background: var(--color-bg-secondary);
+              color: var(--color-text);
+            ">
+            <span style="font-size: 14px;">mm</span>
           `;
           
-          const input = dimensionBox.querySelector('#diameterInput');
-          const applyBtn = dimensionBox.querySelector('#applyDimension');
+          contentDiv.appendChild(inputRow);
           
-          applyBtn.addEventListener('click', () => {
-            const diameter = parseFloat(input.value);
-            if (diameter > 0) {
-              scaleElement(element, { width: diameter, height: diameter });
-            }
+          // Create scale buttons row
+          const buttonRow = document.createElement('div');
+          buttonRow.className = 'buttonList';
+          
+          const scaleOperations = [
+            { scale: 0.5, title: 'Halve size (Alt+H)', icon: '½' },
+            { scale: 0.9, title: 'Scale down (Alt+↓)', icon: '↓' },
+            { scale: 1.1, title: 'Scale up (Alt+↑)', icon: '↑' },
+            { scale: 2.0, title: 'Double size (Alt+D)', icon: '2×' }
+          ];
+          
+          scaleOperations.forEach(({ scale, title, icon }) => {
+            const button = document.createElement('button');
+            button.className = 'ToolIcon_type_button ToolIcon_size_medium ToolIcon';
+            button.title = title;
+            button.type = 'button';
+            button.setAttribute('aria-label', title);
+            
+            const iconWrapper = document.createElement('div');
+            iconWrapper.className = 'ToolIcon__icon';
+            iconWrapper.setAttribute('aria-hidden', 'true');
+            iconWrapper.innerHTML = `<span style="font-size: 16px; font-weight: bold;">${icon}</span>`;
+            
+            button.appendChild(iconWrapper);
+            
+            button.addEventListener('click', () => {
+              scaleElements([element], scale);
+            });
+            
+            buttonRow.appendChild(button);
           });
+          
+          contentDiv.appendChild(buttonRow);
+          
+          const input = inputRow.querySelector('#diameterInput');
           
           input.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
@@ -329,64 +571,131 @@
           });
         } else {
           // Ellipse with different width/height
-          createTwoDimensionUI(element, widthMm, heightMm, pixelsPerMm);
+          createTwoDimensionUI(contentDiv, element, widthMm, heightMm, pixelsPerMm);
         }
         
       } else {
         // Box type (rectangles, diamonds, polygons)
         const widthMm = dims.width / pixelsPerMm;
         const heightMm = dims.height / pixelsPerMm;
-        createTwoDimensionUI(element, widthMm, heightMm, pixelsPerMm);
+        createTwoDimensionUI(contentDiv, element, widthMm, heightMm, pixelsPerMm);
       }
     }
-
-    dimensionBox.style.display = 'block';
+  }
+  
+  // Update UI for multiple elements
+  function updateMultiElementUI(contentDiv, selectedElements) {
+    // Clear existing content
+    contentDiv.innerHTML = '';
+    
+    // Create scale buttons using native Excalidraw button classes
+    const buttonRow = document.createElement('div');
+    buttonRow.className = 'buttonList';
+    
+    const scaleOperations = [
+      { scale: 0.5, title: 'Halve size (Alt+H)', icon: '½' },
+      { scale: 0.9, title: 'Scale down (Alt+↓)', icon: '↓' },
+      { scale: 1.1, title: 'Scale up (Alt+↑)', icon: '↑' },
+      { scale: 2.0, title: 'Double size (Alt+D)', icon: '2×' }
+    ];
+    
+    scaleOperations.forEach(({ scale, title, icon }) => {
+      const button = document.createElement('button');
+      button.className = 'ToolIcon_type_button ToolIcon_size_medium ToolIcon';
+      button.title = title;
+      button.type = 'button';
+      button.setAttribute('aria-label', title);
+      
+      // Create inner icon wrapper
+      const iconWrapper = document.createElement('div');
+      iconWrapper.className = 'ToolIcon__icon';
+      iconWrapper.setAttribute('aria-hidden', 'true');
+      iconWrapper.innerHTML = `<span style="font-size: 16px; font-weight: bold;">${icon}</span>`;
+      
+      button.appendChild(iconWrapper);
+      
+      // Add click handler
+      button.addEventListener('click', () => {
+        scaleElements(selectedElements, scale);
+      });
+      
+      buttonRow.appendChild(button);
+    });
+    
+    contentDiv.innerHTML = '';
+    contentDiv.appendChild(buttonRow);
   }
   
   // Helper function for two-dimension UI
-  function createTwoDimensionUI(element, widthMm, heightMm, pixelsPerMm) {
-    dimensionBox.innerHTML = `
-      <div style="display: flex; flex-direction: column; gap: 10px;">
-        <div style="display: flex; flex-direction: column; gap: 8px;">
-          <div style="display: flex; gap: 8px; align-items: center;">
-            <label style="font-size: 12px; color: #666; width: 45px;">Width:</label>
-            <input id="widthInput" type="number" value="${widthMm.toFixed(1)}" step="0.1" style="
-              width: 70px;
-              padding: 6px;
-              border: 1px solid #ddd;
-              border-radius: 4px;
-              font-size: 14px;
-            ">
-            <span style="font-size: 14px; color: #666;">mm</span>
-          </div>
-          <div style="display: flex; gap: 8px; align-items: center;">
-            <label style="font-size: 12px; color: #666; width: 45px;">Height:</label>
-            <input id="heightInput" type="number" value="${heightMm.toFixed(1)}" step="0.1" style="
-              width: 70px;
-              padding: 6px;
-              border: 1px solid #ddd;
-              border-radius: 4px;
-              font-size: 14px;
-            ">
-            <span style="font-size: 14px; color: #666;">mm</span>
-          </div>
+  function createTwoDimensionUI(contentDiv, element, widthMm, heightMm, pixelsPerMm) {
+    contentDiv.innerHTML = `
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <label style="font-size: 12px; width: 45px;">Width:</label>
+          <input id="widthInput" type="number" value="${widthMm.toFixed(1)}" step="0.1" style="
+            width: 70px;
+            padding: 6px;
+            border: 1px solid var(--color-border);
+            border-radius: 4px;
+            font-size: 14px;
+            background: var(--color-bg-secondary);
+            color: var(--color-text);
+          ">
+          <span style="font-size: 14px;">mm</span>
         </div>
-        <button id="applyDimension" style="
-          background: #6965DB;
-          color: white;
-          border: none;
-          padding: 8px 16px;
-          border-radius: 6px;
-          cursor: pointer;
-          font-size: 14px;
-          width: 100%;
-        ">Apply</button>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <label style="font-size: 12px; width: 45px;">Height:</label>
+          <input id="heightInput" type="number" value="${heightMm.toFixed(1)}" step="0.1" style="
+            width: 70px;
+            padding: 6px;
+            border: 1px solid var(--color-border);
+            border-radius: 4px;
+            font-size: 14px;
+            background: var(--color-bg-secondary);
+            color: var(--color-text);
+          ">
+          <span style="font-size: 14px;">mm</span>
+        </div>
       </div>
     `;
     
-    const widthInput = dimensionBox.querySelector('#widthInput');
-    const heightInput = dimensionBox.querySelector('#heightInput');
-    const applyBtn = dimensionBox.querySelector('#applyDimension');
+    // Create scale buttons row
+    const buttonRow = document.createElement('div');
+    buttonRow.className = 'buttonList';
+    buttonRow.style.marginTop = '8px';
+    
+    const scaleOperations = [
+      { scale: 0.5, title: 'Halve size (Alt+H)', icon: '½' },
+      { scale: 0.9, title: 'Scale down (Alt+↓)', icon: '↓' },
+      { scale: 1.1, title: 'Scale up (Alt+↑)', icon: '↑' },
+      { scale: 2.0, title: 'Double size (Alt+D)', icon: '2×' }
+    ];
+    
+    scaleOperations.forEach(({ scale, title, icon }) => {
+      const button = document.createElement('button');
+      button.className = 'ToolIcon_type_button ToolIcon_size_medium ToolIcon';
+      button.title = title;
+      button.type = 'button';
+      button.setAttribute('aria-label', title);
+      
+      const iconWrapper = document.createElement('div');
+      iconWrapper.className = 'ToolIcon__icon';
+      iconWrapper.setAttribute('aria-hidden', 'true');
+      iconWrapper.innerHTML = `<span style="font-size: 16px; font-weight: bold;">${icon}</span>`;
+      
+      button.appendChild(iconWrapper);
+      
+      button.addEventListener('click', () => {
+        scaleElements([element], scale);
+      });
+      
+      buttonRow.appendChild(button);
+    });
+    
+    contentDiv.appendChild(buttonRow);
+    
+    const widthInput = contentDiv.querySelector('#widthInput');
+    const heightInput = contentDiv.querySelector('#heightInput');
     
     const applyDimensions = () => {
       const width = parseFloat(widthInput.value);
@@ -396,8 +705,6 @@
       }
     };
     
-    applyBtn.addEventListener('click', applyDimensions);
-    
     widthInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') applyDimensions();
     });
@@ -406,11 +713,56 @@
       if (e.key === 'Enter') applyDimensions();
     });
   }
+  
+  // Scale multiple elements
+  function scaleElements(elements, scaleFactor) {
+    const updatedElements = elements.map(element => {
+      const newElement = { ...element };
+      
+      if (element.type === 'line' || element.type === 'arrow') {
+        // Scale points from first point
+        newElement.points = element.points.map((point, index) => {
+          if (index === 0) return point;
+          return [
+            element.points[0][0] + (point[0] - element.points[0][0]) * scaleFactor,
+            element.points[0][1] + (point[1] - element.points[0][1]) * scaleFactor
+          ];
+        });
+      } else {
+        // Scale width and height
+        newElement.width = element.width * scaleFactor;
+        newElement.height = element.height * scaleFactor;
+        
+        // For center-based scaling (ellipse, diamond)
+        if (element.type === 'ellipse' || element.type === 'diamond') {
+          newElement.x = element.x + (element.width - newElement.width) / 2;
+          newElement.y = element.y + (element.height - newElement.height) / 2;
+        }
+      }
+      
+      newElement.updated = Date.now();
+      newElement.versionNonce = Math.random() * 2000000000 | 0;
+      
+      return newElement;
+    });
+    
+    console.log('[Scale] Scaling', elements.length, 'elements by', scaleFactor);
+    
+    // Update Excalidraw
+    window.postMessage({
+      type: 'UPDATE_EXCALIDRAW_ELEMENTS',
+      newElements: updatedElements,
+      originalIds: elements.map(el => el.id)
+    }, '*');
+  }
 
   function hideDimensionBox() {
-    if (dimensionBox) {
-      dimensionBox.style.display = 'none';
+    // Hide the scale container
+    const container = document.getElementById('excalidraw-scale-ext');
+    if (container) {
+      container.style.display = 'none';
     }
+    updateScaleUI([]);
   }
 
   // Listen for state updates and clicks
@@ -418,29 +770,80 @@
     if (event.data.type === 'EXCALIDRAW_STATE_UPDATE') {
       const { selectedIds, elements } = event.data;
 
-      // Check if a single element is selected
+      // Get all selected elements
       const selectedElements = elements.filter(el => selectedIds.includes(el.id) && !el.isDeleted);
+      currentSelectedElements = selectedElements;
 
-      if (selectedElements.length === 1) {
-        const element = selectedElements[0];
-        const dims = getElementDimensions(element);
+      // Filter to only scalable elements
+      const scalableElements = selectedElements.filter(el => {
+        const dims = getElementDimensions(el);
+        return dims !== null;
+      });
+
+      if (scalableElements.length > 0) {
+        // Check if container still exists
+        const container = document.getElementById('excalidraw-scale-ext');
         
-        if (dims) {
-          currentElement = element;
-          updateDimensionBox(element);
+        if (!container) {
+          // Container was removed, need to re-inject
+          console.log('[Scale] Container missing, re-injecting...');
+          scaleUIInjected = false;
+          injectScaleUIIntoSidebar(scalableElements);
+        } else if (!scaleUIInjected) {
+          // First time injection
+          injectScaleUIIntoSidebar(scalableElements);
         } else {
-          // Unsupported element type (text, image, etc.)
-          currentElement = null;
-          hideDimensionBox();
+          // Container exists, just update it
+          container.style.display = 'block';
+          updateScaleUI(scalableElements);
         }
       } else {
-        currentElement = null;
-        hideDimensionBox();
+        // No scalable elements - hide the container
+        const container = document.getElementById('excalidraw-scale-ext');
+        if (container) {
+          container.style.display = 'none';
+        }
+        updateScaleUI([]);
       }
     }
   });
+  
+  // Add keyboard shortcuts for scaling
+  document.addEventListener('keydown', (e) => {
+    if (e.altKey && !e.ctrlKey && !e.metaKey && currentSelectedElements.length > 0) {
+      let scaleFactor = null;
+      
+      if (e.key === 'ArrowUp') {
+        scaleFactor = 1.1;
+        e.preventDefault();
+      } else if (e.key === 'ArrowDown') {
+        scaleFactor = 0.9;
+        e.preventDefault();
+      } else if (e.key.toLowerCase() === 'd') {
+        scaleFactor = 2.0;
+        e.preventDefault();
+      } else if (e.key.toLowerCase() === 'h') {
+        scaleFactor = 0.5;
+        e.preventDefault();
+      }
+      
+      if (scaleFactor && currentSelectedElements.length > 0) {
+        const scalableElements = currentSelectedElements.filter(el => getElementDimensions(el) !== null);
+        if (scalableElements.length > 0) {
+          scaleElements(scalableElements, scaleFactor);
+        }
+      }
+    }
+  }, true);
 
   // Handle clicks on canvas - removed to prevent popup UI
 
   // Removed click detection and popup UI - we only use the bottom-right dimension box now
+  
+  // Clean up observer on unload
+  window.addEventListener('beforeunload', () => {
+    if (sidebarObserver) {
+      sidebarObserver.disconnect();
+    }
+  });
 })();
