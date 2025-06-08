@@ -158,7 +158,7 @@
     // Update Excalidraw
     window.postMessage({
       type: 'UPDATE_EXCALIDRAW_ELEMENTS',
-      newElement: newElement,
+      newElements: [newElement],  // Changed to array
       originalIds: [element.id]
     }, '*');
   }
