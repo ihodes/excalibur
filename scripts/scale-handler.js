@@ -221,7 +221,6 @@
             mmLength: 100
           };
           console.log('[Scale] Set reference:', element.id, 'as 100mm');
-          showToast('Scale reference set: 100mm');
           updateDimensionBox(element); // Update to show dimension input
         }
       });

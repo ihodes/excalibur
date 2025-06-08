@@ -26,7 +26,6 @@ function initializeBooleanOperations() {
   };
   boolOpsScript.onerror = function() {
     console.error('[Boolean Ops] Failed to load boolean operations');
-    showToast('Failed to load required library', 'error');
   };
   document.head.appendChild(boolOpsScript);
 }
@@ -48,49 +47,15 @@ function initializeBooleanOperationsCore() {
     document.head.appendChild(updateScript);
   }, 100);
   
-  // Create validation feedback
+  // Create validation feedback (hidden)
   const validationFeedback = document.createElement('div');
   validationFeedback.className = 'boolean-ops-validation';
   validationFeedback.style.display = 'none';
   document.body.appendChild(validationFeedback);
   
-  // Create the toolbar (hidden by default)
-  const toolbar = document.createElement('div');
-  toolbar.className = 'boolean-ops-toolbar';
-  toolbar.style.display = 'none';
-  toolbar.innerHTML = `
-    <div class="boolean-ops-buttons">
-      <button class="boolean-op-btn" data-op="union" title="Union — Alt++">
-        <svg width="20" height="20" viewBox="0 0 512 512" fill="none">
-          <path d="M320 0a192 192 0 00-181.02 128H48c-26.51 0-48 21.49-48 48v288c0 26.51 21.49 48 48 48h288c26.51 0 48-21.49 48-48v-90.98A192 192 0 00512 192 192 192 0 00320 0z" fill="#6965DB"/>
-        </svg>
-        Union
-      </button>
-      <button class="boolean-op-btn" data-op="intersection" title="Intersection — Alt+*">
-        <svg width="20" height="20" viewBox="0 0 512 512" fill="none">
-          <path d="M48 128c-26.51 0-48 21.49-48 48v2.725h46.174a38.914 38.914 0 0110.443-8.668V128zm72.617 0v37h9.291a192 192 0 019.072-37zM0 242.725v42.668h37v-42.668zm0 106.668v42.666h37v-42.666zm384 23.627a192 192 0 01-37 9.072v9.967h37zM0 456.059V464c0 26.51 21.49 48 48 48h8.617v-42.059a38.927 38.927 0 01-14.17-13.882zm341.553 0a38.927 38.927 0 01-7.543 9.13V512H336c26.51 0 48-21.49 48-48v-7.941zM120.617 475v37h42.697v-37zm106.697 0v37h42.696v-37z" fill="#fba94d"/>
-          <path d="M287.547 0a194.725 194.725 0 00-80.365 33.285l27.006 27.006a157.2 157.2 0 0153.359-22.102V0zm64.908 0v38.19a157.2 157.2 0 0153.358 22.101l27.005-27.006A194.725 194.725 0 00352.455 0zm126.26 79.182l-27.004 27.004a157.2 157.2 0 0122.101 53.36H512a194.725 194.725 0 00-33.285-80.364zm-317.428.002A194.725 194.725 0 00128 159.547h38.19a157.2 157.2 0 0122.101-53.36l-27.004-27.003zm312.525 145.271a157.2 157.2 0 01-22.103 53.357l27.006 27.006A194.725 194.725 0 00512 224.455h-38.188zm-68 99.256a157.2 157.2 0 01-53.357 22.101V384a194.725 194.725 0 0080.361-33.285l-27.003-27.004z" fill="#fba94d"/>
-          <path d="M138.982 128A192 192 0 00128 192a192 192 0 00192 192 192 192 0 0064-10.98V176c0-26.51-21.49-48-48-48z" fill="#6965DB"/>
-        </svg>
-        Intersect
-      </button>
-      <button class="boolean-op-btn" data-op="difference" title="Difference — Alt+-">
-        <svg width="20" height="20" viewBox="0 0 512 512" fill="none">
-          <path d="M48 128c-26.51 0-48 21.49-48 48v288c0 26.51 21.49 48 48 48h288c26.51 0 48-21.49 48-48v-90.98A192 192 0 01320 384a192 192 0 01-192-192 192 192 0 0110.98-64z" fill="#6965DB"/>
-          <path d="M290.233 0a194.725 194.725 0 00-80.364 33.286l27.005 27.005a157.2 157.2 0 0153.36-22.102zm64.909 0v38.189A157.2 157.2 0 01408.5 60.29l27.004-27.005A194.725 194.725 0 00355.142 0zM481.4 79.182l-27.002 27.003a157.2 157.2 0 0122.102 53.362h38.187A194.725 194.725 0 00481.4 79.182zm-317.425.002a194.725 194.725 0 00-33.288 80.363h38.188a157.2 157.2 0 0122.102-53.36zm-33.288 145.271a194.725 194.725 0 0033.286 80.363l27.004-27.005a157.2 157.2 0 01-22.102-53.358zm345.813 0a157.2 157.2 0 01-22.104 53.358l27.004 27.005a194.725 194.725 0 0033.287-80.363zm-239.626 99.256l-27.003 27.003A194.725 194.725 0 00290.233 384v-38.189a157.2 157.2 0 01-53.36-22.1zm171.626 0a157.2 157.2 0 01-53.358 22.102V384a194.725 194.725 0 0080.36-33.286z" fill="#fba94d"/>
-        </svg>
-        Difference
-      </button>
-      <button class="boolean-op-btn" data-op="exclusion" title="Exclusion — Alt+^">
-        <svg width="20" height="20" viewBox="0 0 512 512" fill="none">
-          <path d="M320 0a192 192 0 00-181.02 128H336c26.51 0 48 21.49 48 48v197.02A192 192 0 00512 192 192 192 0 00320 0zm64 373.02A192 192 0 01320 384a192 192 0 01-192-192 192 192 0 0110.98-64H48c-26.51 0-48 21.49-48 48v288c0 26.51 21.49 48 48 48h288c26.51 0 48-21.49 48-48v-90.98z" fill="#6965DB"/>
-        </svg>
-        Exclusion
-      </button>
-    </div>
-  `;
-  
-  document.body.appendChild(toolbar);
+  // We'll inject buttons into the sidebar instead of creating a separate toolbar
+  let booleanOpsInjected = false;
+  let sidebarObserver = null;
   
   // Add keyboard shortcuts
   document.addEventListener('keydown', (e) => {
@@ -115,31 +80,259 @@ function initializeBooleanOperationsCore() {
     }
   }, true);
   
-  // Visual feedback for Alt key
-  let altPressed = false;
-  document.addEventListener('keydown', (e) => {
-    if (e.altKey && !altPressed) {
-      altPressed = true;
-      toolbar.classList.add('alt-pressed');
-    }
-  });
-  
-  document.addEventListener('keyup', (e) => {
-    if (!e.altKey && altPressed) {
-      altPressed = false;
-      toolbar.classList.remove('alt-pressed');
-    }
-  });
-  
-  // Add click handlers
-  toolbar.querySelectorAll('.boolean-op-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const operation = btn.dataset.op;
-      if (validationInfo && validationInfo.isValid) {
-        performBooleanOperation(operation);
+  // Function to inject boolean ops into Excalidraw's sidebar
+  function injectBooleanOpsIntoSidebar(isValid = false) {
+    const checkAndInject = () => {
+      // First, let's find the sidebar and understand its structure
+      const sidebar = document.querySelector('.App-menu__left');
+      if (!sidebar) {
+        console.log('[Boolean Ops] Sidebar not found, retrying...');
+        setTimeout(checkAndInject, 500);
+        return;
       }
-    });
-  });
+      
+      // Log the sidebar structure to understand it better
+      console.log('[Boolean Ops] Sidebar found:', sidebar);
+      
+      // Try multiple ways to find sections
+      let sections = sidebar.querySelectorAll('.Island');
+      if (sections.length === 0) {
+        sections = sidebar.querySelectorAll('[class*="Island"]');
+      }
+      if (sections.length === 0) {
+        sections = sidebar.querySelectorAll('section');
+      }
+      if (sections.length === 0) {
+        sections = sidebar.children;
+      }
+      
+      console.log('[Boolean Ops] Found', sections.length, 'sections');
+      
+      Array.from(sections).forEach((section, index) => {
+        const buttons = section.querySelectorAll('button');
+        const labels = Array.from(buttons).map(b => b.getAttribute('aria-label') || b.getAttribute('title') || b.textContent?.trim()).filter(Boolean);
+        if (labels.length > 0) {
+          console.log(`[Boolean Ops] Section ${index}:`, labels.slice(0, 3).join(', ') + (labels.length > 3 ? '...' : ''));
+        }
+      });
+      
+      // Find the bottom section - work backwards through sections
+      let actionsSection = null;
+      const allSections = Array.from(sections);
+      
+      // Look for the last section that has buttons
+      for (let i = allSections.length - 1; i >= 0; i--) {
+        const section = allSections[i];
+        const hasButtons = section.querySelector('button');
+        const hasColorPicker = section.querySelector('input[type="color"], [aria-label*="color" i], [aria-label*="Color"]');
+        
+        if (hasButtons && !hasColorPicker) {
+          actionsSection = section;
+          console.log('[Boolean Ops] Found bottom action section at index', i);
+          break;
+        }
+      }
+      
+      // If still not found, try specific selectors
+      if (!actionsSection) {
+        const bottomSelectors = [
+          '.App-menu__left .Island:last-child',
+          '.App-menu__left > div:last-child',
+          '[class*="footer"]',
+          '[class*="actions"]'
+        ];
+        
+        for (const selector of bottomSelectors) {
+          actionsSection = sidebar.querySelector(selector);
+          if (actionsSection && actionsSection.querySelector('button')) {
+            console.log('[Boolean Ops] Found section with selector:', selector);
+            break;
+          }
+        }
+      }
+      
+      if (!actionsSection) {
+        console.log('[Boolean Ops] Could not find suitable action section, retrying...');
+        setTimeout(checkAndInject, 500);
+        return;
+      }
+      
+      // Create boolean ops container as fieldset like native sections
+      const booleanOpsContainer = document.createElement('fieldset');
+      booleanOpsContainer.className = 'boolean-ops-container';
+      booleanOpsContainer.style.display = 'none';
+      
+      // Add legend like native sections
+      const legend = document.createElement('legend');
+      legend.textContent = 'Boolean ops';
+      booleanOpsContainer.appendChild(legend);
+      
+      // Create button container using native buttonList class
+      const buttonRow = document.createElement('div');
+      buttonRow.className = 'buttonList';
+      
+      // Create buttons with SVGs from diff.diff
+      const operations = [
+        { 
+          op: 'union', 
+          title: 'Union (Alt++)', 
+          path: 'M320 0a192 192 0 00-181.02 128H48c-26.51 0-48 21.49-48 48v288c0 26.51 21.49 48 48 48h288c26.51 0 48-21.49 48-48v-90.98A192 192 0 00512 192 192 192 0 00320 0z' 
+        },
+        { 
+          op: 'intersection', 
+          title: 'Intersection (Alt+*)', 
+          paths: [
+            { path: 'M48 128c-26.51 0-48 21.49-48 48v2.725h46.174a38.914 38.914 0 0110.443-8.668V128zm72.617 0v37h9.291a192 192 0 019.072-37zM0 242.725v42.668h37v-42.668zm0 106.668v42.666h37v-42.666zm384 23.627a192 192 0 01-37 9.072v9.967h37zM0 456.059V464c0 26.51 21.49 48 48 48h8.617v-42.059a38.927 38.927 0 01-14.17-13.882zm341.553 0a38.927 38.927 0 01-7.543 9.13V512H336c26.51 0 48-21.49 48-48v-7.941zM120.617 475v37h42.697v-37zm106.697 0v37h42.696v-37z', fill: '#fba94d' },
+            { path: 'M287.547 0a194.725 194.725 0 00-80.365 33.285l27.006 27.006a157.2 157.2 0 0153.359-22.102V0zm64.908 0v38.19a157.2 157.2 0 0153.358 22.101l27.005-27.006A194.725 194.725 0 00352.455 0zm126.26 79.182l-27.004 27.004a157.2 157.2 0 0122.101 53.36H512a194.725 194.725 0 00-33.285-80.364zm-317.428.002A194.725 194.725 0 00128 159.547h38.19a157.2 157.2 0 0122.101-53.36l-27.004-27.003zm312.525 145.271a157.2 157.2 0 01-22.103 53.357l27.006 27.006A194.725 194.725 0 00512 224.455h-38.188zm-68 99.256a157.2 157.2 0 01-53.357 22.101V384a194.725 194.725 0 0080.361-33.285l-27.003-27.004z', fill: '#fba94d' },
+            { path: 'M138.982 128A192 192 0 00128 192a192 192 0 00192 192 192 192 0 0064-10.98V176c0-26.51-21.49-48-48-48z', fill: 'currentColor' }
+          ]
+        },
+        { 
+          op: 'difference', 
+          title: 'Difference (Alt+-)', 
+          paths: [
+            { path: 'M48 128c-26.51 0-48 21.49-48 48v288c0 26.51 21.49 48 48 48h288c26.51 0 48-21.49 48-48v-90.98A192 192 0 01320 384a192 192 0 01-192-192 192 192 0 0110.98-64z', fill: 'currentColor' },
+            { path: 'M290.233 0a194.725 194.725 0 00-80.364 33.286l27.005 27.005a157.2 157.2 0 0153.36-22.102zm64.909 0v38.189A157.2 157.2 0 01408.5 60.29l27.004-27.005A194.725 194.725 0 00355.142 0zM481.4 79.182l-27.002 27.003a157.2 157.2 0 0122.102 53.362h38.187A194.725 194.725 0 00481.4 79.182zm-317.425.002a194.725 194.725 0 00-33.288 80.363h38.188a157.2 157.2 0 0122.102-53.36zm-33.288 145.271a194.725 194.725 0 0033.286 80.363l27.004-27.005a157.2 157.2 0 01-22.102-53.358zm345.813 0a157.2 157.2 0 01-22.104 53.358l27.004 27.005a194.725 194.725 0 0033.287-80.363zm-239.626 99.256l-27.003 27.003A194.725 194.725 0 00290.233 384v-38.189a157.2 157.2 0 01-53.36-22.1zm171.626 0a157.2 157.2 0 01-53.358 22.102V384a194.725 194.725 0 0080.36-33.286z', fill: '#fba94d' }
+          ]
+        },
+        { 
+          op: 'exclusion', 
+          title: 'Exclusion (Alt+^)', 
+          path: 'M320 0a192 192 0 00-181.02 128H336c26.51 0 48 21.49 48 48v197.02A192 192 0 00512 192 192 192 0 00320 0zm64 373.02A192 192 0 01320 384a192 192 0 01-192-192 192 192 0 0110.98-64H48c-26.51 0-48 21.49-48 48v288c0 26.51 21.49 48 48 48h288c26.51 0 48-21.49 48-48v-90.98z' 
+        }
+      ];
+      
+      operations.forEach((opConfig) => {
+        const { op, title } = opConfig;
+        const button = document.createElement('button');
+        
+        // Use native Excalidraw button classes
+        button.className = 'ToolIcon_type_button ToolIcon_size_medium ToolIcon_type_button--show ToolIcon';
+        
+        button.dataset.op = op;
+        button.title = title;
+        button.type = 'button';
+        button.setAttribute('aria-label', title);
+        
+        // Create inner icon wrapper like native buttons
+        const iconWrapper = document.createElement('div');
+        iconWrapper.className = 'ToolIcon__icon';
+        iconWrapper.setAttribute('aria-hidden', 'true');
+        iconWrapper.setAttribute('aria-disabled', 'false');
+        
+        console.log('[Boolean Ops] Using native ToolIcon button classes');
+        
+        // Handle single path or multiple paths
+        if (opConfig.path) {
+          iconWrapper.innerHTML = `
+            <svg aria-hidden="true" focusable="false" role="img" viewBox="0 0 512 512" class="" fill="currentColor">
+              <path d="${opConfig.path}"/>
+            </svg>
+          `;
+        } else if (opConfig.paths) {
+          // Replace the orange color with a brighter one for dark mode
+          const pathElements = opConfig.paths.map(p => {
+            const fill = p.fill === '#fba94d' ? '#ffb84d' : (p.fill || 'currentColor');
+            return `<path d="${p.path}" fill="${fill}"/>`;
+          }).join('\n');
+          iconWrapper.innerHTML = `
+            <svg aria-hidden="true" focusable="false" role="img" viewBox="0 0 512 512" class="">
+              ${pathElements}
+            </svg>
+          `;
+        }
+        
+        button.appendChild(iconWrapper);
+        
+        // Add click handler
+        button.addEventListener('click', () => {
+          if (validationInfo && validationInfo.isValid) {
+            performBooleanOperation(op);
+          }
+        });
+        
+        buttonRow.appendChild(button);
+      });
+      
+      booleanOpsContainer.appendChild(buttonRow);
+      
+      // Add a unique ID to track our container
+      booleanOpsContainer.id = 'excalidraw-boolean-ops-ext';
+      
+      // Try different injection strategies
+      let injected = false;
+      
+      // First, check if we're already injected
+      const existing = document.getElementById('excalidraw-boolean-ops-ext');
+      if (existing) {
+        console.log('[Boolean Ops] Already injected, updating visibility');
+        existing.style.display = isValid ? 'flex' : 'none';
+        return;
+      }
+      
+      // Make sure we're not in the color section
+      const hasColorPicker = actionsSection.querySelector('[aria-label*="color"], [aria-label*="Color"], input[type="color"]');
+      if (hasColorPicker) {
+        console.log('[Boolean Ops] Skipping color section, looking for bottom section...');
+        // Try to find the actual bottom actions section
+        const allSections = document.querySelectorAll('.App-menu__left > .Island, .App-menu__left > section');
+        for (let i = allSections.length - 1; i >= 0; i--) {
+          const section = allSections[i];
+          // Look for sections with action buttons but no color pickers
+          if (section.querySelector('button') && !section.querySelector('input[type="color"]')) {
+            actionsSection = section;
+            console.log('[Boolean Ops] Found bottom action section');
+            break;
+          }
+        }
+      }
+      
+      if (!actionsSection) {
+        console.log('[Boolean Ops] Could not find suitable section');
+        setTimeout(checkAndInject, 500);
+        return;
+      }
+      
+      // Now inject into the bottom section
+      // Look for the content area within the section
+      let targetContainer = actionsSection.querySelector('[class*="Island_content"], .Island_content__sLouC');
+      
+      if (!targetContainer) {
+        // If no content area, use the section itself
+        targetContainer = actionsSection;
+      }
+      
+      // Append container directly without spacing
+      targetContainer.appendChild(booleanOpsContainer);
+      injected = true;
+      
+      if (injected) {
+        booleanOpsInjected = true;
+        console.log('[Boolean Ops] Successfully injected');
+        // Show immediately if valid
+        booleanOpsContainer.style.display = isValid ? 'flex' : 'none';
+        
+        // Debug: log the DOM structure
+        console.log('[Boolean Ops] Container parent:', booleanOpsContainer.parentElement);
+        console.log('[Boolean Ops] Container visible:', window.getComputedStyle(booleanOpsContainer).display);
+      }
+    };
+    
+    checkAndInject();
+  }
+  
+  // Function to update boolean ops visibility
+  function updateBooleanOpsVisibility(isValid) {
+    const container = document.querySelector('.boolean-ops-container');
+    if (container) {
+      container.style.display = isValid ? 'flex' : 'none';
+    } else if (isValid) {
+      // Container was removed, need to re-inject
+      console.log('[Boolean Ops] Container not found, re-injecting...');
+      booleanOpsInjected = false;
+      injectBooleanOpsIntoSidebar(isValid);
+    }
+  }
   
   // Listen for state updates
   window.addEventListener('message', (event) => {
@@ -154,24 +347,13 @@ function initializeBooleanOperationsCore() {
       // Update validation feedback
       updateValidationFeedback(validationFeedback, validationInfo);
       
-      // Update toolbar visibility - only show when valid
-      if (validationInfo && validationInfo.isValid) {
-        toolbar.style.display = 'block';
-        toolbar.classList.add('show');
-        
-        // Enable all buttons
-        toolbar.querySelectorAll('.boolean-op-btn').forEach(btn => {
-          btn.removeAttribute('disabled');
-          btn.classList.remove('disabled');
-        });
-      } else {
-        toolbar.classList.remove('show');
-        setTimeout(() => {
-          if (!toolbar.classList.contains('show')) {
-            toolbar.style.display = 'none';
-          }
-        }, 200);
+      // Inject boolean ops into sidebar if not already done
+      if (!booleanOpsInjected) {
+        injectBooleanOpsIntoSidebar(validationInfo && validationInfo.isValid);
       }
+      
+      // Update button visibility based on validation
+      updateBooleanOpsVisibility(validationInfo && validationInfo.isValid);
     } else if (event.data.type === 'DEBUG_STATE_RESULTS') {
       // Debug state results received
     } else if (event.data.type === 'BOOLEAN_OP_RESULT') {
@@ -180,7 +362,6 @@ function initializeBooleanOperationsCore() {
       // Toast disabled - operation completed successfully
     } else if (event.data.type === 'EXCALIDRAW_UPDATE_FAILED') {
       console.error('[Boolean Ops] Update failed:', event.data.error);
-      showToast('Failed to update canvas', 'error');
     } else if (event.data.type === 'REQUEST_DEBUG_STATE') {
       injectDebugState();
     }
@@ -368,7 +549,7 @@ function updateValidationFeedback(feedbackElement, validation) {
 
 async function performBooleanOperation(operation) {
   if (!validationInfo || !validationInfo.isValid) {
-    showToast('Please select at least 2 valid shapes', 'error');
+    console.log('[Boolean Ops] Invalid selection for operation');
     return;
   }
   
@@ -394,7 +575,6 @@ async function performBooleanOperation(operation) {
     }, '*');
   } catch (error) {
     console.error('[Boolean Ops] Error:', error);
-    showToast('Failed to perform boolean operation', 'error');
     // Remove loading state
     document.querySelectorAll('.boolean-op-btn.loading').forEach(btn => {
       btn.classList.remove('loading');
@@ -402,21 +582,7 @@ async function performBooleanOperation(operation) {
   }
 }
 
-function showToast(message, type = 'info') {
-  const toast = document.createElement('div');
-  toast.className = `boolean-ops-toast ${type}`;
-  toast.textContent = message;
-  document.body.appendChild(toast);
-  
-  setTimeout(() => {
-    toast.classList.add('show');
-  }, 10);
-  
-  setTimeout(() => {
-    toast.classList.remove('show');
-    setTimeout(() => toast.remove(), 300);
-  }, 3000);
-}
+// Toast notifications removed - using console logging instead
 
 // Handle boolean operation results
 function handleBooleanOpResult(data) {
@@ -427,7 +593,6 @@ function handleBooleanOpResult(data) {
   
   if (!data.success) {
     console.error('[Boolean Ops] Operation failed:', data.error);
-    showToast(data.error || 'Boolean operation failed', 'error');
     return;
   }
   

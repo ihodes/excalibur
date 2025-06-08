@@ -15,3 +15,7 @@ Before you're done
 
 
 Remember, this is meant to be a Chrome extension.
+
+
+If you cannot do something or are fairly uncertain if something will work, don't pretend to: it's better to discuss it and let me know.
+
