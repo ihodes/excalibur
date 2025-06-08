@@ -1,8 +1,8 @@
-// Update Excalidraw with new element
+// Update Excalidraw with new elements
 (function() {
   window.addEventListener('message', function(event) {
     if (event.data.type === 'UPDATE_EXCALIDRAW_ELEMENTS') {
-      const { newElement, originalIds } = event.data;
+      const { newElements, originalIds } = event.data;
       
       try {
         // Find Excalidraw's React instance
@@ -46,9 +46,15 @@
                               excalidrawComponent.state?.elements || 
                               [];
         
-        // Validate the new element
-        if (!newElement || !newElement.id || !newElement.type) {
-          throw new Error('Invalid element created');
+        // Validate the new elements
+        if (!newElements || !Array.isArray(newElements) || newElements.length === 0) {
+          throw new Error('Invalid elements created');
+        }
+        
+        for (const elem of newElements) {
+          if (!elem || !elem.id || !elem.type) {
+            throw new Error('Invalid element in results');
+          }
         }
         
         // Ensure arrays are initialized
@@ -56,28 +62,30 @@
           throw new Error('Current elements is not an array');
         }
         
-        // Remove original elements and add new one
-        const newElements = currentElements.filter(el => 
+        // Remove original elements and add new ones
+        const filteredElements = currentElements.filter(el => 
           el && !originalIds.includes(el.id)
         );
-        newElements.push(newElement);
+        const updatedElements = [...filteredElements, ...newElements];
         
-        console.log('[Boolean Ops] Updating with', newElements.length, 'elements');
+        console.log('[Boolean Ops] Updating with', updatedElements.length, 'elements (added', newElements.length, 'new)');
         
         // Update the scene
         if (excalidrawComponent.setElements) {
-          excalidrawComponent.setElements(newElements);
+          excalidrawComponent.setElements(updatedElements);
         } else if (excalidrawComponent.updateScene) {
-          excalidrawComponent.updateScene({ elements: newElements });
+          excalidrawComponent.updateScene({ elements: updatedElements });
         } else if (excalidrawComponent.setState) {
-          excalidrawComponent.setState({ elements: newElements });
+          excalidrawComponent.setState({ elements: updatedElements });
         }
         
-        // Select the new element
+        // Select all new elements
         if (excalidrawComponent.setState) {
-          excalidrawComponent.setState({ 
-            selectedElementIds: { [newElement.id]: true }
-          });
+          const selectedElementIds = {};
+          for (const elem of newElements) {
+            selectedElementIds[elem.id] = true;
+          }
+          excalidrawComponent.setState({ selectedElementIds });
         }
         
         console.log('[Boolean Ops] Successfully updated Excalidraw');
